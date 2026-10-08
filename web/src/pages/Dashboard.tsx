@@ -1,178 +1,149 @@
-import { Activity, AlertOctagon, Atom, Blocks, Cpu, Database, FileStack, Radar, ScrollText, ShieldCheck, ShieldHalf } from "lucide-react";
+import { motion } from "framer-motion";
+import { Radar } from "lucide-react";
 import { Link, useNavigate } from "react-router";
-import { Button, Card, cx, Empty, ErrorState, Hash, Loading, PageHeader, Pill, Stat, StatusBadge } from "../components/ui";
-import { api, type AuditEntry, type RecordSummary } from "../lib/api";
-import { formatTime, nf, timeAgo } from "../lib/format";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Button, cx, Dot, Empty, ErrorState, Loading, PageHeader, Section, Stat, StatusBadge } from "../components/ui";
+import { api, type AuditEntry } from "../lib/api";
+import { nf, timeAgo } from "../lib/format";
 import { useAction, useApi } from "../lib/hooks";
 
+interface Activity { id: number; timestamp: string; actor: string; action: string; recordId: string; result: string; recordType: string; algorithm: string; integrityStatus: string; productId: string | null }
 interface DashboardData {
   metrics: { totalRecords: number; landRecords: number; products: number; events: number; verified: number; tamperAlerts: number; legacy: number; unverified: number; ledgerBlocks: number; pqcSigned: number };
   system: {
     cryptoEngine: { online: boolean; detail: string };
-    ledgerIntegrity: { valid: boolean; detail: string; tamperedBlocks: number[] };
+    ledgerIntegrity: { valid: boolean; detail: string };
     pqcVerification: { online: boolean; detail: string };
     auditSystem: { online: boolean; detail: string };
     quantumService: { online: boolean; ibmConfigured?: boolean; detail?: string };
   };
   ledger: { tipIndex: number; tipHash: string; tipAt: string; checkMs: number };
-  recent: RecordSummary[];
   alerts: { id: string; title: string; type: string; at: string | null }[];
   recentAudit: AuditEntry[];
+  recentActivity: Activity[];
   activity: { day: string; n: number }[];
-  lastScan: { at: string; durationMs: number; entities: number; verified: number; tampered: number; signaturesVerified: number; chainValid: boolean } | null;
+  lastScan: { at: string; durationMs: number; entities: number; tampered: number; signaturesVerified: number } | null;
 }
 
-function StatusRow({ label, ok, okText, badText, detail, icon }: { label: string; ok: boolean; okText: string; badText: string; detail: string; icon: React.ReactNode }) {
+const TYPE_LABEL: Record<string, string> = { LAND_RECORD: "Land record", SUPPLY_PRODUCT: "Supply chain", SUPPLY_EVENT: "Supply chain" };
+const ACTION_LABEL: Record<string, string> = {
+  CREATE_RECORD: "Created", VERIFY_RECORD: "Verified", VERIFY_PROVENANCE: "Chain verified", SUPPLY_EVENT: "Event signed",
+  TAMPER_DETECTED: "Tamper detected", TAMPER_ATTEMPT: "Tamper simulated", PQC_MIGRATION: "Migrated to ML-DSA", RESTORE_ORIGINAL: "Restored",
+};
+
+const recordLink = (r: { id: string; type?: string }) => {
+  if (r.type === "SUPPLY_PRODUCT") return `/supply-chain/${r.id}`;
+  if (r.type === "SUPPLY_EVENT") return `/supply-chain/${r.id.replace(/-E\d+$/, "")}`;
+  if (r.type === "LEDGER_BLOCK") return `/ledger?block=${r.id.replace("BLOCK-", "")}`;
+  return `/records/${r.id}`;
+};
+
+function SystemRow({ label, ok, text, detail }: { label: string; ok: boolean; text: string; detail: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 py-3">
-      <div className="flex min-w-0 items-center gap-3">
-        <div className="text-slate-400">{icon}</div>
-        <div className="min-w-0">
-          <div className="text-sm font-medium text-slate-100">{label}</div>
-          <div className="truncate text-[11px] text-slate-500">{detail}</div>
-        </div>
-      </div>
-      <div className={cx("flex shrink-0 items-center gap-2 font-mono text-xs font-bold tracking-wider", ok ? "text-emerald-300" : "text-red-300")}>
-        <span className="relative flex h-2 w-2">
-          <span className={cx("absolute inline-flex h-full w-full animate-ping rounded-full opacity-60", ok ? "bg-emerald-400" : "bg-red-400")} />
-          <span className={cx("relative inline-flex h-2 w-2 rounded-full", ok ? "bg-emerald-400" : "bg-red-400")} />
-        </span>
-        {ok ? okText : badText}
-      </div>
+    <div className="flex items-center justify-between gap-4 py-3">
+      <div className="min-w-0"><div className="text-[14px] font-medium text-slate-100">{label}</div><div className="truncate text-xs text-slate-500">{detail}</div></div>
+      <div className={cx("flex shrink-0 items-center gap-2 text-[13px] font-medium", ok ? "text-slate-200" : "text-red-300")}><Dot tone={ok ? "green" : "red"} />{text}</div>
     </div>
   );
 }
-
-const recordLink = (r: { id: string; recordType?: string; type?: string }) => {
-  const t = r.recordType ?? r.type;
-  if (t === "SUPPLY_PRODUCT") return `/supply-chain/${r.id}`;
-  if (t === "SUPPLY_EVENT") return `/supply-chain/${r.id.replace(/-E\d+$/, "")}`;
-  if (t === "LEDGER_BLOCK") return `/ledger?block=${r.id.replace("BLOCK-", "")}`;
-  return `/records/${r.id}`;
-};
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { data, error, loading, reload } = useApi(() => api.get<DashboardData>("/dashboard"), [], { pollMs: 15000 });
   const scan = useAction(async () => { await api.post("/integrity/scan"); await reload(); });
 
-  if (loading && !data) return <Loading label="Loading security posture…" />;
+  if (loading && !data) return <Loading label="Loading overview…" />;
   if (error && !data) return <ErrorState error={error} onRetry={reload} />;
   if (!data) return null;
   const { metrics: m, system: s } = data;
-  const maxActivity = Math.max(1, ...data.activity.map((a) => a.n));
-  const allOnline = s.cryptoEngine.online && s.ledgerIntegrity.valid && s.pqcVerification.online;
+  const secure = s.cryptoEngine.online && s.ledgerIntegrity.valid && s.pqcVerification.online;
+  const q = s.quantumService;
 
   return (
     <div>
       <PageHeader
-        eyebrow="Security operations"
-        title={<>{nf.format(m.totalRecords)} protected records</>}
-        description={
-          <span className="flex flex-wrap items-center gap-2">
-            <span className={cx("inline-flex items-center gap-1.5 font-medium", allOnline ? "text-emerald-300" : "text-red-300")}>
-              <ShieldCheck className="h-4 w-4" /> {allOnline ? "Post-quantum (ML-DSA) verification online" : "Integrity issue detected"}
-            </span>
-            <span className="text-slate-500">·</span>
-            <span>{nf.format(m.pqcSigned)} records signed with ML-DSA-65 · ledger tip #{data.ledger.tipIndex} · {timeAgo(data.ledger.tipAt)}</span>
-          </span>
-        }
-        actions={
-          <>
-            <Button onClick={() => navigate("/records/LAND-AP-VZM-10293")} icon={<FileStack className="h-4 w-4" />}>Demo record</Button>
-            <Button variant="primary" onClick={() => scan.run()} loading={scan.pending} icon={<Radar className="h-4 w-4" />}>Run full integrity scan</Button>
-          </>
-        }
+        title="Overview"
+        description="Post-quantum security infrastructure"
+        actions={<Button onClick={() => scan.run()} loading={scan.pending} icon={<Radar className="h-4 w-4" />}>Run integrity scan</Button>}
       />
-      {scan.error && <div className="mb-4"><ErrorState error={scan.error} /></div>}
+      {scan.error && <div className="mb-5"><ErrorState error={scan.error} /></div>}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat label="Total records" value={nf.format(m.totalRecords)} sub={`${nf.format(m.landRecords)} land · ${m.products} products · ${m.events} provenance events`} icon={<Database className="h-5 w-5" />} />
-        <Stat label="Verified" value={nf.format(m.verified)} tone="green" sub={`${m.legacy} legacy-signed · ${m.unverified} awaiting re-verification`} icon={<ShieldCheck className="h-5 w-5" />} />
-        <Stat label="Security alerts" value={nf.format(m.tamperAlerts)} tone={m.tamperAlerts ? "red" : "slate"} sub={m.tamperAlerts ? "Integrity violations detected" : "No integrity violations"} icon={<AlertOctagon className="h-5 w-5" />} />
-        <Stat label="Ledger blocks" value={nf.format(m.ledgerBlocks)} sub={<>Chain {s.ledgerIntegrity.valid ? "intact" : "BROKEN"} · walked in {data.ledger.checkMs} ms</>} icon={<Blocks className="h-5 w-5" />} />
+      {/* Metrics: one divided grid, not four cards */}
+      <div className="grid grid-cols-2 divide-x divide-y divide-ink-700 overflow-hidden rounded-xl border border-ink-700 bg-ink-900 lg:grid-cols-4 lg:divide-y-0">
+        <Stat label="Protected records" value={nf.format(m.totalRecords)} sub={`${nf.format(m.landRecords)} land · ${m.products} products · ${m.events} events`} />
+        <Stat label="Verified" value={nf.format(m.verified)} sub={m.legacy ? `${m.legacy} legacy-signed` : "All with ML-DSA"} />
+        <Stat label="Ledger blocks" value={nf.format(m.ledgerBlocks)} sub={`Tip #${data.ledger.tipIndex} · chain ${s.ledgerIntegrity.valid ? "intact" : "broken"}`} />
+        <Stat label="Security alerts" value={nf.format(m.tamperAlerts)} tone={m.tamperAlerts ? "red" : "slate"} sub={m.tamperAlerts ? "Integrity violations detected" : "None"} />
       </div>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-3">
-        <Card title="Recent records" subtitle="Latest signed registrations" className="xl:col-span-2" bodyClass="p-0" actions={<Link to="/land" className="text-xs text-brand-400 hover:underline">View registry</Link>}>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead><tr className="text-left"><th className="label px-5 py-3">Record</th><th className="label px-3 py-3">Details</th><th className="label hidden px-3 py-3 md:table-cell">Hash</th><th className="label px-5 py-3 text-right">Status</th></tr></thead>
-              <tbody className="divide-y divide-white/[0.05]">
-                {data.recent.map((r) => (
-                  <tr key={r.id} className="cursor-pointer transition hover:bg-white/[0.03]" onClick={() => navigate(recordLink(r))}>
-                    <td className="px-5 py-3 font-mono text-xs font-semibold text-white">{r.id}</td>
-                    <td className="max-w-[260px] truncate px-3 py-3 text-slate-300">{r.title}</td>
-                    <td className="hidden px-3 py-3 md:table-cell"><Hash value={r.dataHash} n={6} /></td>
-                    <td className="px-5 py-3 text-right"><StatusBadge status={r.integrityStatus} /></td>
-                  </tr>
+      <div className="mt-12 grid gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <Section title="System integrity" description={data.lastScan ? `Last full scan ${timeAgo(data.lastScan.at)}: ${nf.format(data.lastScan.signaturesVerified)} signatures and blocks in ${data.lastScan.durationMs} ms` : undefined}>
+          <div className="mb-2 flex items-center gap-2.5">
+            <Dot tone={secure ? "green" : "red"} />
+            <span className={cx("text-[22px] font-bold tracking-[-0.01em]", secure ? "text-white" : "text-red-300")}>{secure ? "SECURE" : "ATTENTION REQUIRED"}</span>
+          </div>
+          <div className="divide-y divide-ink-800">
+            <SystemRow label="Cryptographic engine" ok={s.cryptoEngine.online} text={s.cryptoEngine.online ? "Operational" : "Offline"} detail={s.cryptoEngine.detail} />
+            <SystemRow label="Ledger integrity" ok={s.ledgerIntegrity.valid} text={s.ledgerIntegrity.valid ? "Verified" : "Failure"} detail={s.ledgerIntegrity.detail} />
+            <SystemRow label="PQC verification" ok={s.pqcVerification.online} text={s.pqcVerification.online ? "Operational" : "Offline"} detail="ML-DSA-65 signature verification" />
+            <SystemRow label="Audit system" ok={s.auditSystem.online} text={s.auditSystem.online ? "Operational" : "Offline"} detail={s.auditSystem.detail} />
+            <SystemRow label="IBM Quantum connection" ok={q.online && Boolean(q.ibmConfigured)} text={!q.online ? "Service offline" : q.ibmConfigured ? "Connected" : "Not configured"} detail={q.online ? (q.ibmConfigured ? "Qiskit Runtime · IBM Quantum platform" : "Simulators only · add an IBM API key to enable hardware") : "Optional; independent of the security layer"} />
+          </div>
+        </Section>
+
+        <div className="space-y-10">
+          <Section title="Security alerts" description="Records whose verification currently fails" actions={<Link to="/audit" className="text-[13px] text-brand-400 hover:underline">Audit trail</Link>}>
+            {data.alerts.length === 0 ? <Empty title="No active alerts" description="Every verified record matches its signature and ledger anchor." /> : (
+              <ul className="divide-y divide-ink-800">
+                {data.alerts.slice(0, 5).map((a) => (
+                  <li key={a.id}>
+                    <Link to={recordLink(a)} className="flex items-center justify-between gap-4 py-2.5 hover:text-white">
+                      <span className="flex min-w-0 items-center gap-3"><Dot tone="red" /><span className="font-mono text-[13px] text-slate-100">{a.id}</span><span className="hidden truncate text-[13px] text-slate-500 sm:inline">{a.title}</span></span>
+                      <span className="shrink-0 text-xs text-slate-500">{a.at ? timeAgo(a.at) : ""}</span>
+                    </Link>
+                  </li>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+              </ul>
+            )}
+          </Section>
 
-        <Card title="System status" subtitle="Live health of the trust stack" icon={<Activity className="h-4 w-4" />} bodyClass="py-1">
-          <div className="divide-y divide-white/[0.05]">
-            <StatusRow label="Cryptographic Engine" ok={s.cryptoEngine.online} okText="ONLINE" badText="OFFLINE" detail={s.cryptoEngine.detail} icon={<Cpu className="h-4 w-4" />} />
-            <StatusRow label="Ledger Integrity" ok={s.ledgerIntegrity.valid} okText="VERIFIED" badText="BROKEN" detail={s.ledgerIntegrity.detail} icon={<Blocks className="h-4 w-4" />} />
-            <StatusRow label="PQC Verification" ok={s.pqcVerification.online} okText="ONLINE" badText="OFFLINE" detail="ML-DSA-65 signature verification" icon={<ShieldHalf className="h-4 w-4" />} />
-            <StatusRow label="Audit System" ok={s.auditSystem.online} okText="ONLINE" badText="OFFLINE" detail={s.auditSystem.detail} icon={<ScrollText className="h-4 w-4" />} />
-            <StatusRow label="Quantum Threat Lab" ok={s.quantumService.online} okText={s.quantumService.ibmConfigured ? "IBM READY" : "SIM READY"} badText="OFFLINE" detail={s.quantumService.online ? (s.quantumService.ibmConfigured ? "Qiskit + IBM Quantum configured" : "Qiskit simulators (IBM token not set)") : "Optional · separate from security layer"} icon={<Atom className="h-4 w-4" />} />
-          </div>
-        </Card>
+          <Section title="Ledger activity" description="Blocks appended per day, last 14 days">
+            <div className="h-[132px]" aria-label="Ledger blocks per day">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.activity} margin={{ top: 4, right: 0, left: -24, bottom: 0 }}>
+                  <CartesianGrid vertical={false} stroke="#202b38" />
+                  <XAxis dataKey="day" tickFormatter={(d: string) => d.slice(8)} stroke="#667383" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#667383" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} allowDecimals={false} />
+                  <Tooltip cursor={{ fill: "rgba(255,255,255,0.04)" }} contentStyle={{ background: "#0d131c", border: "1px solid #202b38", borderRadius: 6, fontSize: 12 }} labelStyle={{ color: "#9aa6b2" }} formatter={(v) => [`${v} blocks`, ""]} separator="" />
+                  <Bar dataKey="n" fill="#2f7bff" radius={[2, 2, 0, 0]} maxBarSize={22} isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Section>
+        </div>
       </div>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-3">
-        <Card title="Security alerts" subtitle="Integrity violations found by verification" bodyClass="p-0" icon={<AlertOctagon className="h-4 w-4 text-red-400" />}>
-          {data.alerts.length === 0 ? <Empty icon={<ShieldCheck className="h-8 w-8 text-emerald-400" />} title="No active alerts" description="Every verified record matches its signature and ledger anchor." /> : (
-            <ul className="divide-y divide-white/[0.05]">
-              {data.alerts.map((a) => (
-                <li key={a.id}>
-                  <Link to={recordLink(a)} className="flex items-start gap-3 px-5 py-3 transition hover:bg-red-500/[0.04]">
-                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.9)]" />
-                    <div className="min-w-0"><div className="font-mono text-xs font-semibold text-red-200">{a.id}</div><div className="truncate text-xs text-slate-400">{a.title}</div></div>
-                  </Link>
-                </li>
+      <Section title="Recent activity" description="Signing, verification and integrity events across all registries" className="mt-12" actions={<Link to="/audit" className="text-[13px] text-brand-400 hover:underline">View full audit trail</Link>}>
+        <div className="overflow-x-auto rounded-lg border border-ink-700">
+          <table className="w-full min-w-[760px] text-[13px]">
+            <thead className="border-b border-ink-700 bg-ink-900"><tr><th className="th">Record</th><th className="th">Type</th><th className="th">Event</th><th className="th">Actor</th><th className="th">Time</th><th className="th">Verification</th><th className="th">Status</th></tr></thead>
+            <tbody className="divide-y divide-ink-800">
+              {data.recentActivity.map((a, i) => (
+                <motion.tr key={a.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2, delay: i * 0.025 }} className="cursor-pointer hover:bg-ink-900" onClick={() => navigate(recordLink({ id: a.recordId, type: a.recordType }))}>
+                  <td className="td font-mono text-[12px] font-medium text-white">{a.recordId}</td>
+                  <td className="td text-slate-300">{TYPE_LABEL[a.recordType] ?? a.recordType}</td>
+                  <td className="td text-slate-300">{ACTION_LABEL[a.action] ?? a.action}</td>
+                  <td className="td text-slate-300">{a.actor}</td>
+                  <td className="td whitespace-nowrap text-slate-400">{timeAgo(a.timestamp)}</td>
+                  <td className="td text-slate-300">{a.algorithm?.startsWith("ML-DSA") ? "ML-DSA" : a.algorithm ?? "—"}</td>
+                  <td className="td"><StatusBadge status={a.integrityStatus} /></td>
+                </motion.tr>
               ))}
-            </ul>
-          )}
-        </Card>
-
-        <Card title="Ledger activity" subtitle="Blocks appended per day (last 14 days)">
-          {data.activity.length === 0 ? <Empty title="No recent blocks" /> : (
-            <div className="flex h-40 items-end gap-1.5">
-              {data.activity.map((a) => (
-                <div key={a.day} className="group flex flex-1 flex-col items-center gap-1">
-                  <div className="text-[10px] text-slate-500 opacity-0 transition group-hover:opacity-100">{a.n}</div>
-                  <div className="w-full rounded-t bg-gradient-to-t from-brand-600/60 to-cyan-400/80" style={{ height: `${Math.max(6, (a.n / maxActivity) * 120)}px` }} title={`${a.day}: ${a.n} blocks`} />
-                  <div className="text-[9px] text-slate-500">{a.day.slice(8)}</div>
-                </div>
-              ))}
-            </div>
-          )}
-          {data.lastScan && (
-            <div className="mt-4 rounded-lg border border-white/[0.06] bg-ink-900/50 p-3 text-xs text-slate-400">
-              Last full scan {timeAgo(data.lastScan.at)}: <span className="text-slate-200">{nf.format(data.lastScan.signaturesVerified)}</span> signatures &amp; blocks re-verified in {data.lastScan.durationMs} ms ·{" "}
-              <span className={data.lastScan.tampered ? "text-red-300" : "text-emerald-300"}>{data.lastScan.tampered} tampered</span>
-            </div>
-          )}
-        </Card>
-
-        <Card title="Recent audit events" bodyClass="p-0" actions={<Link to="/audit" className="text-xs text-brand-400 hover:underline">Full trail</Link>}>
-          <ul className="divide-y divide-white/[0.05]">
-            {data.recentAudit.map((a) => (
-              <li key={a.id} className="px-5 py-2.5">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-xs font-semibold text-slate-200">{a.action}</span>
-                  <Pill tone={["DETECTED", "INVALID", "FAILED"].includes(a.result) ? "red" : a.result === "WARNING" ? "amber" : a.result === "INFO" ? "slate" : "green"}>{a.result}</Pill>
-                </div>
-                <div className="mt-0.5 truncate text-[11px] text-slate-500">{formatTime(a.timestamp)} · {a.actor}{a.recordId ? ` · ${a.recordId}` : ""}</div>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      </div>
+              {data.recentActivity.length === 0 && <tr><td colSpan={7}><Empty title="No activity yet" /></td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </Section>
     </div>
   );
 }

@@ -1,22 +1,25 @@
+import { lazy, Suspense } from "react";
 import { Route, Routes, Link } from "react-router";
 import { Layout } from "./components/Layout";
-import { Empty } from "./components/ui";
-import Dashboard from "./pages/Dashboard";
-import LandRegistry from "./pages/LandRegistry";
-import CreateLandRecord from "./pages/CreateLandRecord";
-import RecordDetail from "./pages/RecordDetail";
-import SupplyChain from "./pages/SupplyChain";
-import ProductDetail from "./pages/ProductDetail";
-import Verify from "./pages/Verify";
-import Ledger from "./pages/Ledger";
-import Audit from "./pages/Audit";
-import Migration from "./pages/Migration";
-import QuantumLab from "./pages/QuantumLab";
-import Settings from "./pages/Settings";
+import { Empty, Loading } from "./components/ui";
+
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const LandRegistry = lazy(() => import("./pages/LandRegistry"));
+const CreateLandRecord = lazy(() => import("./pages/CreateLandRecord"));
+const RecordDetail = lazy(() => import("./pages/RecordDetail"));
+const SupplyChain = lazy(() => import("./pages/SupplyChain"));
+const ProductDetail = lazy(() => import("./pages/ProductDetail"));
+const Verify = lazy(() => import("./pages/Verify"));
+const Ledger = lazy(() => import("./pages/Ledger"));
+const Audit = lazy(() => import("./pages/Audit"));
+const Migration = lazy(() => import("./pages/Migration"));
+const QuantumLab = lazy(() => import("./pages/QuantumLab"));
+const Settings = lazy(() => import("./pages/Settings"));
 
 export default function App() {
   return (
     <Layout>
+      <Suspense fallback={<Loading />}>
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/land" element={<LandRegistry />} />
@@ -33,6 +36,7 @@ export default function App() {
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Empty title="Page not found" description="The page you requested does not exist." action={<Link className="text-brand-400 hover:underline" to="/">Back to dashboard</Link>} />} />
       </Routes>
+      </Suspense>
     </Layout>
   );
 }

@@ -147,11 +147,14 @@ export function createSignedRecord(input: {
   };
 }
 
-export function listRecords(opts: { type?: string; status?: string; q?: string; limit?: number; offset?: number; featuredFirst?: boolean }) {
+export function listRecords(opts: { type?: string; status?: string; propertyType?: string; year?: string; q?: string; limit?: number; offset?: number; featuredFirst?: boolean }) {
   const where: string[] = [];
   const params: (string | number)[] = [];
   if (opts.type) { where.push("record_type = ?"); params.push(opts.type); }
   if (opts.status) { where.push("integrity_status = ?"); params.push(opts.status); }
+  // Record data is stored as canonical (space-free) JSON, so exact key/value fragments are safe to match.
+  if (opts.propertyType && /^[A-Za-z ]+$/.test(opts.propertyType)) { where.push("data LIKE ?"); params.push(`%"propertyType":"${opts.propertyType}"%`); }
+  if (opts.year && /^\d{4}$/.test(opts.year)) { where.push("data LIKE ?"); params.push(`%"registrationDate":"${opts.year}-%`); }
   if (opts.q) {
     where.push("(id LIKE ? OR title LIKE ? OR data LIKE ?)");
     const like = `%${opts.q}%`;
@@ -210,22 +213,24 @@ export interface RecordVerification extends EntityVerification {
   demoTampered: boolean;
 }
 
-export function verifyRecord(id: string, actor = "Verifier", chain?: ChainReport): RecordVerification {
+export function verifyRecord(id: string, actor = "Verifier", chain?: ChainReport, opts: { passive?: boolean } = {}): RecordVerification {
   const row = requireRecord(id);
   const report = verifyEntity(recordAsEntity(row), chain ?? verifyChain());
   const status = verdictToStatus(report.verdict);
   db.prepare("UPDATE records SET integrity_status = ?, last_verified_at = ? WHERE id = ?").run(status, report.verifiedAt, id);
   const failed = report.checks.filter((c) => c.status === "fail").map((c) => c.label);
-  logAudit({
-    actor,
-    action: "VERIFY_RECORD",
-    recordId: id,
-    result: report.verdict === "TAMPERED" ? "INVALID" : "VALID",
-    hash: report.computedHash,
-    details: report.verdict === "TAMPERED" ? `Failed: ${failed.join(", ")}` : `${report.algorithm} signature valid; ledger anchor block #${row.block_index}`,
-  });
-  if (report.verdict === "TAMPERED") {
-    logAudit({ actor: "System", action: "TAMPER_DETECTED", recordId: id, result: "DETECTED", hash: report.computedHash, details: `Integrity violation: ${failed.join(", ")}` });
+  if (!opts.passive) {
+    logAudit({
+      actor,
+      action: "VERIFY_RECORD",
+      recordId: id,
+      result: report.verdict === "TAMPERED" ? "INVALID" : "VALID",
+      hash: report.computedHash,
+      details: report.verdict === "TAMPERED" ? `Failed: ${failed.join(", ")}` : `${report.algorithm} signature valid; ledger anchor block #${row.block_index}`,
+    });
+    if (report.verdict === "TAMPERED") {
+      logAudit({ actor: "System", action: "TAMPER_DETECTED", recordId: id, result: "DETECTED", hash: report.computedHash, details: `Integrity violation: ${failed.join(", ")}` });
+    }
   }
   return {
     ...report,

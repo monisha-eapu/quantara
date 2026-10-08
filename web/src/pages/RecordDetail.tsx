@@ -1,194 +1,285 @@
-import { ArrowLeft, Blocks, FileSignature, Fingerprint, FlaskConical, Hash as HashIcon, History, KeyRound, RotateCcw, ShieldCheck } from "lucide-react";
-import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { ArrowDown, ArrowLeft, FlaskConical, Link2, Loader2, RotateCcw, ShieldAlert, ShieldCheck } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
-import { ChangedFields, CheckList, HashComparison, VerdictBanner } from "../components/Verification";
 import { TamperDialog, type TamperMode } from "../components/TamperDialog";
-import { Button, Card, cx, Empty, ErrorState, Hash, KV, Loading, PageHeader, Pill, StatusBadge } from "../components/ui";
-import { api, type EntityVerification, type RecordDetail as Detail } from "../lib/api";
-import { fieldLabel, formatDateTime, LAND_FIELD_LABELS, timeAgo } from "../lib/format";
-import { useAction, useApi } from "../lib/hooks";
+import { ChangedFields, CheckList, HashComparison } from "../components/Verification";
+import { Button, cx, Dot, Empty, ErrorState, Hash, InlineError, Loading, PageHeader, Section, StatusBadge } from "../components/ui";
+import { api, type Block, type EntityVerification, type RecordDetail as Detail } from "../lib/api";
+import { fieldLabel, formatDateTime } from "../lib/format";
+import { useAction } from "../lib/hooks";
 
 const HIDDEN = new Set(["recordType"]);
+const ORDER = ["propertyId", "ownerName", "surveyNumber", "district", "state", "area", "propertyType", "registrationDate", "status", "issuingAuthority"];
+type ChainBlock = Block & { hashValid: boolean; linkValid: boolean };
+
+/** One-click demo edit: Ravi Kumar → Raj Kumar (or an equivalent small change for other owners). */
+function forgedOwner(name: string): string {
+  const parts = name.split(" ");
+  parts[0] = parts[0] === "Raj" ? "Ravi" : "Raj";
+  return parts.join(" ");
+}
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export default function RecordDetail() {
   const { id = "" } = useParams();
-  const { data, error, loading, reload, setData } = useApi(() => api.get<Detail>(`/records/${encodeURIComponent(id)}`), [id]);
-  const [report, setReport] = useState<EntityVerification | null>(null);
-  const [verifyCount, setVerifyCount] = useState(0);
-  const [tamperOpen, setTamperOpen] = useState(false);
+  const rid = encodeURIComponent(id);
+  const [detail, setDetail] = useState<Detail | null>(null);
+  const [report, setReport] = useState<(EntityVerification) | null>(null);
+  const [chain, setChain] = useState<ChainBlock[]>([]);
+  const [loadError, setLoadError] = useState<Error | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const [customOpen, setCustomOpen] = useState(false);
 
-  const verify = useAction(async () => {
-    const r = await api.post<EntityVerification>(`/records/${encodeURIComponent(id)}/verify`);
-    setReport(r);
-    setVerifyCount((n) => n + 1);
-    await reload();
+  const loadChain = useCallback(async (blockIndex: number) => {
+    const res = await api.get<{ blocks: ChainBlock[] }>(`/ledger?before=${blockIndex + 1}&limit=3`);
+    setChain(res.blocks);
+  }, []);
+
+  const verify = useCallback(async (passive = false) => {
+    setVerifying(true);
+    try {
+      const r = await api.post<EntityVerification>(`/records/${rid}/verify${passive ? "?passive=1" : ""}`);
+      const d = await api.get<Detail>(`/records/${rid}`);
+      setReport(r);
+      setDetail(d);
+      return r;
+    } finally {
+      setVerifying(false);
+    }
+  }, [rid]);
+
+  useEffect(() => {
+    let alive = true;
+    setDetail(null); setReport(null); setLoadError(null); setChain([]);
+    (async () => {
+      try {
+        const d = await api.get<Detail>(`/records/${rid}`);
+        if (!alive) return;
+        setDetail(d);
+        if (d.block) loadChain(d.block.index).catch(() => undefined);
+        await verify(true); // passive: shows true current state without adding audit noise
+      } catch (e) {
+        if (alive) setLoadError(e as Error);
+      }
+    })();
+    return () => { alive = false; };
+  }, [rid, verify, loadChain]);
+
+  const runVerify = useAction(async () => { await verify(false); });
+  const tamperDemo = useAction(async () => {
+    if (!detail) return;
+    const owner = String(detail.record.data.ownerName ?? "");
+    const d = await api.post<Detail>(`/records/${rid}/tamper`, { field: "ownerName", value: forgedOwner(owner), mode: "FIELD_ONLY" satisfies TamperMode });
+    setDetail(d);          // the record visibly changes first…
+    setVerifying(true);
+    await wait(650);
+    await verify(false);   // …then verification runs automatically
   });
-  const tamper = useAction(async (input: { field: string; value: string; mode: TamperMode }) => {
-    const d = await api.post<Detail>(`/records/${encodeURIComponent(id)}/tamper`, input);
-    setData(d);
-    setReport(null);
-    setTamperOpen(false);
+  const tamperCustom = useAction(async (input: { field: string; value: string; mode: TamperMode }) => {
+    const d = await api.post<Detail>(`/records/${rid}/tamper`, input);
+    setDetail(d);
+    setCustomOpen(false);
+    setVerifying(true);
+    await wait(400);
+    await verify(false);
   });
   const restore = useAction(async () => {
-    const d = await api.post<Detail>(`/records/${encodeURIComponent(id)}/restore`);
-    setData(d);
-    setReport(null);
+    const d = await api.post<Detail>(`/records/${rid}/restore`);
+    setDetail(d);
+    setVerifying(true);
+    await wait(300);
+    await verify(false);
   });
 
-  if (loading && !data) return <Loading label="Loading record…" />;
-  if (error && !data) return <ErrorState error={error} onRetry={reload} />;
-  if (!data) return null;
+  if (loadError) return <ErrorState error={loadError} onRetry={() => window.location.reload()} />;
+  if (!detail) return <Loading label="Loading record…" />;
 
-  const { record } = data;
-  const changed = new Set(data.tamper.changedFields.map((f) => f.field));
-  const order = Object.keys(LAND_FIELD_LABELS);
-  const rank = (k: string) => (order.includes(k) ? order.indexOf(k) : order.length);
-  const fields = Object.keys(record.data).filter((k) => !HIDDEN.has(k)).sort((a, b) => rank(a) - rank(b));
-  const isPqc = record.algorithm.startsWith("ML-DSA");
+  const { record } = detail;
+  const changed = new Map(detail.tamper.changedFields.map((f) => [f.field, f]));
+  const fields = Object.keys(record.data).filter((k) => !HIDDEN.has(k)).sort((a, b) => (ORDER.indexOf(a) + 100) % 100 - (ORDER.indexOf(b) + 100) % 100);
+  const tampered = report?.verdict === "TAMPERED";
+  const sigCheck = report?.checks.find((c) => c.id === "signature");
+  const hashCheck = report?.checks.find((c) => c.id === "hash");
+  const anchorCheck = report?.checks.find((c) => c.id === "anchor");
+  const chainCheck = report?.checks.find((c) => c.id === "chain");
+  const busy = tamperDemo.pending || restore.pending || runVerify.pending || tamperCustom.pending;
+  const err = tamperDemo.error ?? restore.error ?? runVerify.error;
+  const backTo = record.recordType === "LAND_RECORD" ? ["/land", "Land Records"] : ["/supply-chain", "Supply Chain"];
 
   return (
     <div>
-      <Link to={record.recordType === "LAND_RECORD" ? "/land" : "/supply-chain"} className="mb-4 inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-white">
-        <ArrowLeft className="h-4 w-4" /> Back to {record.recordType === "LAND_RECORD" ? "Land Registry" : "Supply Chain"}
-      </Link>
+      <Link to={backTo[0]} className="mb-5 inline-flex items-center gap-1.5 text-[13px] text-slate-400 hover:text-white"><ArrowLeft className="h-3.5 w-3.5" /> {backTo[1]}</Link>
+
       <PageHeader
-        eyebrow={record.recordType === "LAND_RECORD" ? "Land record" : "Product record"}
-        title={<span className="flex flex-wrap items-center gap-3"><span className="font-mono">{record.id}</span><StatusBadge status={record.integrityStatus} /></span>}
-        description={record.title}
+        title={<span className="flex flex-wrap items-center gap-x-4 gap-y-1"><span className="font-mono text-[26px] tracking-tight">{record.id}</span><StatusBadge status={report ? (tampered ? "TAMPERED" : report.verdict === "AUTHENTIC" ? "VERIFIED" : "LEGACY") : "UNVERIFIED"} /></span>}
+        description={`${record.title} · Registered ${String(record.data.registrationDate ?? "")} · Issued by ${String(record.data.issuingAuthority ?? "")}`}
         actions={
           <>
-            <Button variant="primary" size="lg" onClick={() => verify.run()} loading={verify.pending} icon={<ShieldCheck className="h-4 w-4" />}>
-              {verifyCount > 0 ? "VERIFY AGAIN" : "VERIFY RECORD"}
-            </Button>
-            {data.tamper.active ? (
-              <Button variant="success" size="lg" onClick={() => restore.run()} loading={restore.pending} icon={<RotateCcw className="h-4 w-4" />}>RESTORE ORIGINAL</Button>
+            <Button variant="primary" size="lg" onClick={() => runVerify.run()} loading={runVerify.pending} disabled={busy} icon={<ShieldCheck className="h-4 w-4" />}>Verify record</Button>
+            {detail.tamper.active ? (
+              <Button variant="secondary" size="lg" onClick={() => restore.run()} loading={restore.pending} disabled={busy} icon={<RotateCcw className="h-4 w-4" />}>Restore original</Button>
             ) : (
-              <Button variant="danger" size="lg" onClick={() => { tamper.clearError(); setTamperOpen(true); }} icon={<FlaskConical className="h-4 w-4" />}>SIMULATE TAMPERING</Button>
+              <Button variant="danger" size="lg" onClick={() => tamperDemo.run()} loading={tamperDemo.pending} disabled={busy} icon={<FlaskConical className="h-4 w-4" />}>Simulate tampering</Button>
             )}
           </>
         }
       />
-      {(verify.error || restore.error) && <div className="mb-4"><ErrorState error={(verify.error ?? restore.error)!} /></div>}
+      {err && <div className="mb-5"><InlineError error={err} /></div>}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
-        <div className="space-y-6">
-          <Card
-            title="Record data"
-            subtitle={data.tamper.active ? "⚠ This record has been altered in the database (demo simulation)" : "Canonicalised, hashed and signed at registration"}
-            icon={<FileSignature className="h-4 w-4" />}
-            className={data.tamper.active ? "ring-1 ring-red-500/40" : undefined}
-          >
-            <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
-              {fields.map((k) => (
-                <div key={k} className={cx("rounded-lg p-2 -m-2 transition", changed.has(k) && "bg-red-500/10 ring-1 ring-red-500/40")}>
-                  <div className="label mb-1">{fieldLabel(k)}</div>
-                  <div className={cx("text-[15px] font-medium", changed.has(k) ? "text-red-300" : "text-white", k === "ownerName" && "text-lg")}>
-                    {String(record.data[k])}
-                    {changed.has(k) && <span className="ml-2 align-middle text-[10px] font-bold uppercase tracking-wider text-red-400">altered</span>}
-                  </div>
+      <div className="grid gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
+        {/* LEFT: record information */}
+        <Section
+          title="Record information"
+          description={detail.tamper.active ? "Altered directly in the database. Signature and ledger were not updated." : "Canonicalised, hashed and signed at registration."}
+        >
+          <dl className="divide-y divide-ink-800">
+            {fields.map((k) => {
+              const ch = changed.get(k);
+              return (
+                <div key={k} className={cx("grid grid-cols-[150px_1fr] items-baseline gap-4 py-2.5", ch && "-mx-3 rounded-md bg-red-500/[0.07] px-3")}>
+                  <dt className="text-[13px] text-slate-400">{fieldLabel(k)}</dt>
+                  <dd className="min-w-0 text-[14px] font-medium text-slate-100">
+                    <AnimatePresence mode="wait" initial={false}>
+                      {ch ? (
+                        <motion.div key="changed" initial={{ opacity: 0, y: -3 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
+                          <div className="text-[13px] font-normal text-slate-500 line-through">{String(ch.original)}</div>
+                          <div className="flex items-center gap-1.5 font-semibold text-red-300"><ArrowDown className="h-3.5 w-3.5" />{String(ch.current)}</div>
+                        </motion.div>
+                      ) : (
+                        <motion.div key="same" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>{String(record.data[k])}</motion.div>
+                      )}
+                    </AnimatePresence>
+                  </dd>
                 </div>
-              ))}
-            </div>
-          </Card>
-
-          {report ? (
-            <div className="space-y-4">
-              <VerdictBanner report={report} />
-              <div className="grid gap-4 lg:grid-cols-2">
-                <CheckList report={report} />
-                <div className="space-y-4">
-                  <HashComparison report={report} />
-                  {report.changedFields && <ChangedFields fields={report.changedFields} />}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <Card bodyClass="p-0">
-              <Empty
-                icon={<ShieldCheck className="h-9 w-9 text-brand-400" />}
-                title={data.tamper.active ? "Record altered. Run verification to see what the cryptography detects." : "Run an independent verification"}
-                description="Recomputes the SHA-256 fingerprint, verifies the ML-DSA signature against the signer's registered public key, and checks the ledger anchor and hash chain. Nothing is taken from cached status."
-                action={<Button variant="primary" onClick={() => verify.run()} loading={verify.pending} icon={<ShieldCheck className="h-4 w-4" />}>{verifyCount > 0 ? "Verify again" : "Verify record"}</Button>}
-              />
-            </Card>
+              );
+            })}
+          </dl>
+          {!detail.tamper.active && (
+            <button onClick={() => { tamperCustom.clearError(); setCustomOpen(true); }} className="mt-4 text-[12px] text-slate-500 underline-offset-2 hover:text-slate-300 hover:underline">Choose a different field to tamper with…</button>
           )}
-        </div>
+        </Section>
 
-        <div className="space-y-6">
-          <Card title="Cryptographic seal" icon={<KeyRound className="h-4 w-4" />} actions={<Pill tone={isPqc ? "blue" : "amber"}>{record.algorithm}</Pill>}>
-            <div className="mb-4 grid grid-cols-3 gap-2 text-center">
-              {[
-                ["Signature", record.integrityStatus === "TAMPERED" ? "INVALID" : record.integrityStatus === "UNVERIFIED" ? "PENDING" : "VALID"],
-                ["Hash", record.integrityStatus === "TAMPERED" ? "MISMATCH" : record.integrityStatus === "UNVERIFIED" ? "PENDING" : "VERIFIED"],
-                ["Ledger", record.integrityStatus === "TAMPERED" ? "MISMATCH" : record.integrityStatus === "UNVERIFIED" ? "PENDING" : "VERIFIED"],
-              ].map(([k, v]) => (
-                <div key={k} className={cx("rounded-lg border px-2 py-2", v === "PENDING" ? "border-white/10 bg-white/[0.03]" : ["INVALID", "MISMATCH"].includes(v) ? "border-red-500/40 bg-red-500/10" : "border-emerald-500/30 bg-emerald-500/[0.08]")}>
-                  <div className="text-[10px] uppercase tracking-wider text-slate-400">{k}</div>
-                  <div className={cx("text-xs font-bold", v === "PENDING" ? "text-slate-300" : ["INVALID", "MISMATCH"].includes(v) ? "text-red-300" : "text-emerald-300")}>{v}</div>
+        {/* RIGHT: security verification */}
+        <Section title="Security verification" description="Recomputed from the stored bytes on every check; nothing is read from a cached status.">
+          <div className="rounded-lg border border-ink-700 bg-ink-900">
+            <div className={cx("flex items-center gap-3 border-b px-4 py-3.5", tampered ? "border-red-500/40 bg-red-500/[0.07]" : report ? "border-emerald-500/30 bg-emerald-500/[0.05]" : "border-ink-700")}>
+              {verifying || !report ? <Loader2 className="h-5 w-5 animate-spin text-slate-400" /> : tampered ? <ShieldAlert className="h-5 w-5 text-red-400" /> : <ShieldCheck className="h-5 w-5 text-emerald-400" />}
+              <div>
+                <div className="text-[11px] font-medium uppercase tracking-[0.1em] text-slate-400">Overall</div>
+                <div className={cx("text-[18px] font-bold leading-tight", verifying || !report ? "text-slate-300" : tampered ? "text-red-300" : "text-emerald-300")}>
+                  {verifying || !report ? "Verifying…" : tampered ? "RECORD TAMPERED" : report.verdict === "AUTHENTIC" ? "AUTHENTIC RECORD" : "AUTHENTIC · LEGACY CRYPTOGRAPHY"}
                 </div>
-              ))}
-            </div>
-            <p className="mb-4 text-[11px] text-slate-500">Status from last verification · {timeAgo(record.lastVerifiedAt)}</p>
-            <div className="space-y-4">
-              <KV label="Content hash (SHA-256)"><Hash value={record.dataHash} n={14} /></KV>
-              <KV label="Signature"><span className="text-sm">{data.signatureBytes.toLocaleString()} bytes · <Hash value={data.signature} n={12} /></span></KV>
-              <KV label="Signed by"><div>{data.signer.name}</div><div className="text-xs text-slate-400">{data.signer.organization}</div></KV>
-              <KV label="Public key fingerprint"><span className="flex items-center gap-1.5"><Fingerprint className="h-3.5 w-3.5 text-slate-500" /><Hash value={data.signer.fingerprint} n={10} /></span></KV>
-              {data.legacy && <KV label="Legacy co-signature"><Pill tone="amber">{data.legacy.algorithm} · {data.legacy.signatureBytes} bytes</Pill></KV>}
-              <KV label="Signed message"><code className="block break-all rounded-md bg-ink-950/70 p-2 font-mono text-[10.5px] text-slate-300">{data.signingMessage}</code></KV>
-            </div>
-          </Card>
-
-          <Card title="Ledger anchor" icon={<Blocks className="h-4 w-4" />} actions={<Link to={`/ledger?block=${data.block?.index}`} className="text-xs text-brand-400 hover:underline">Open in explorer</Link>}>
-            {data.block ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between"><span className="font-mono text-lg font-semibold text-white">BLOCK #{data.block.index}</span><Pill>{data.block.action}</Pill></div>
-                <KV label="Block hash"><Hash value={data.block.blockHash} n={12} /></KV>
-                <KV label="Previous hash"><Hash value={data.block.previousHash} n={12} /></KV>
-                <KV label="Timestamp">{formatDateTime(data.block.timestamp)}</KV>
-                {data.ledgerHistory.length > 1 && (
-                  <div className="border-t border-white/[0.06] pt-3">
-                    <div className="label mb-2 flex items-center gap-1.5"><History className="h-3.5 w-3.5" /> Ledger history</div>
-                    {data.ledgerHistory.map((b) => (
-                      <div key={b.index} className="flex items-center justify-between py-1 text-xs"><span className="font-mono text-slate-300">#{b.index} · {b.action}</span><span className="text-slate-400">{b.algorithm}</span></div>
-                    ))}
-                  </div>
-                )}
               </div>
-            ) : <p className="text-sm text-red-300">Anchor block missing</p>}
-          </Card>
-
-          <Card title="Record audit trail" icon={<HashIcon className="h-4 w-4" />} bodyClass="p-0">
-            {data.audit.length === 0 ? <Empty title="No audit entries" /> : (
-              <ul className="max-h-80 divide-y divide-white/[0.05] overflow-y-auto">
-                {data.audit.map((a) => (
-                  <li key={a.id} className="px-5 py-2.5">
-                    <div className="flex items-center justify-between gap-2 text-xs">
-                      <span className="font-semibold text-slate-200">{a.action}</span>
-                      <span className={cx("font-semibold", ["DETECTED", "INVALID", "FAILED"].includes(a.result) ? "text-red-300" : a.result === "WARNING" ? "text-amber-300" : "text-emerald-300")}>{a.result}</span>
-                    </div>
-                    <div className="mt-0.5 text-[11px] text-slate-500">{formatDateTime(a.timestamp)} · {a.actor}</div>
-                  </li>
-                ))}
-              </ul>
+            </div>
+            {report && !verifying && (
+              <p className={cx("border-b border-ink-800 px-4 py-2.5 text-[13px]", tampered ? "text-red-200" : "text-slate-400")}>
+                {tampered
+                  ? `${report.checks.filter((c) => c.status === "fail").length} checks failed: ${report.checks.filter((c) => c.status === "fail").map((c) => c.label).join(", ")}.`
+                  : report.verdict === "AUTHENTIC"
+                    ? `All checks passed. ${report.algorithm} signature by ${report.signer.name}, verified in ${report.durationMs} ms.`
+                    : "Valid today, but signed with a classical algorithm. Migrate to ML-DSA."}
+              </p>
             )}
-          </Card>
-        </div>
+            <dl className="divide-y divide-ink-800 text-[13px]">
+              <StateRow label="Content hash" value={<Hash value={record.dataHash} n={8} className="text-[12px]" />} ok={hashCheck?.status} okText="Matches" badText="Mismatch" />
+              <StateRow label="Digital signature" value={<span className="text-slate-300">{record.algorithm} · {detail.signatureBytes.toLocaleString()} bytes</span>} ok={sigCheck?.status} okText="Valid" badText="Invalid" />
+              <StateRow label="Ledger anchor" value={<span className="text-slate-300">Block #{record.blockIndex}</span>} ok={anchorCheck?.status} okText="Verified" badText="Integrity failure" />
+              <StateRow label="Ledger chain" value={<span className="text-slate-300">{chain.length ? "Hash links recomputed" : "Previous-hash links"}</span>} ok={chainCheck?.status} okText="Intact" badText="Broken" />
+              <div className="flex items-baseline justify-between gap-4 px-4 py-2.5"><dt className="text-slate-400">Signed by</dt><dd className="text-right text-slate-200">{detail.signer.name}<span className="block text-[11px] text-slate-500">{detail.signer.organization}</span></dd></div>
+            </dl>
+          </div>
+        </Section>
       </div>
 
-      {tamperOpen && (
+      {/* Result details */}
+      <AnimatePresence initial={false}>
+        {report && !verifying && (
+          <motion.div key={report.verifiedAt} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }} className="mt-10 space-y-5">
+            <div className="grid gap-x-12 gap-y-6 lg:grid-cols-2">
+              <Section title="Hash comparison"><HashComparison report={report} /></Section>
+              <Section title="Verification checks"><CheckList report={report} /></Section>
+            </div>
+            {report.changedFields && report.changedFields.length > 0 && <ChangedFields fields={report.changedFields} />}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Ledger history */}
+      <Section title="Ledger history" description="The anchoring block and the blocks before it. Each block commits to the hash of the one below." className="mt-12" actions={detail.block && <Link to={`/ledger?block=${detail.block.index}`} className="text-[13px] text-brand-400 hover:underline">Open in ledger explorer</Link>}>
+        {chain.length === 0 ? <Empty title="Ledger blocks unavailable" /> : (
+          <ol>
+            {chain.map((b, i) => {
+              const isAnchor = b.index === record.blockIndex;
+              const bad = !b.hashValid || !b.linkValid;
+              return (
+                <li key={b.index}>
+                  <div className={cx("grid gap-x-6 gap-y-1 rounded-md border px-4 py-3 md:grid-cols-[150px_1.4fr_1fr_1fr]", bad ? "border-red-500/40 bg-red-500/[0.05]" : isAnchor ? "border-brand-500/40 bg-brand-500/[0.05]" : "border-ink-700 bg-ink-900")}>
+                    <div><div className="font-mono text-[14px] font-semibold text-white">Block #{b.index}</div><div className="text-[11px] text-slate-500">{isAnchor ? "Anchors this record" : b.recordType.replace("_", " ").toLowerCase()}</div></div>
+                    <div className="min-w-0"><div className="label">Record</div><div className="truncate font-mono text-[12px] text-slate-200">{b.recordId}</div></div>
+                    <div className="min-w-0"><div className="label">Block hash</div><Hash value={b.blockHash} n={6} /></div>
+                    <div className="min-w-0"><div className="label">Previous hash</div><Hash value={b.previousHash} n={6} /></div>
+                  </div>
+                  {i < chain.length - 1 && (
+                    <div className="flex items-center gap-2 py-1.5 pl-6 text-[11px] text-slate-500">
+                      <ArrowDown className="h-3.5 w-3.5" /><Link2 className={cx("h-3 w-3", b.linkValid ? "text-emerald-400" : "text-red-400")} />
+                      {b.linkValid ? `previous hash of #${b.index} = block hash of #${b.index - 1}` : `broken link between #${b.index} and #${b.index - 1}`}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </Section>
+
+      <Section title="Record audit trail" className="mt-12">
+        {detail.audit.length === 0 ? <Empty title="No audit entries yet" /> : (
+          <div className="overflow-x-auto rounded-lg border border-ink-700">
+            <table className="w-full text-[13px]">
+              <thead className="border-b border-ink-700 bg-ink-900"><tr><th className="th">Timestamp</th><th className="th">Actor</th><th className="th">Action</th><th className="th">Result</th></tr></thead>
+              <tbody className="divide-y divide-ink-800">
+                {detail.audit.map((a) => (
+                  <tr key={a.id}>
+                    <td className="td whitespace-nowrap font-mono text-[12px] text-slate-400">{formatDateTime(a.timestamp)}</td>
+                    <td className="td text-slate-300">{a.actor}</td>
+                    <td className="td font-medium text-slate-100">{a.action.replace(/_/g, " ")}</td>
+                    <td className="td"><span className={cx("inline-flex items-center gap-2 font-medium", ["DETECTED", "INVALID", "FAILED"].includes(a.result) ? "text-red-300" : a.result === "WARNING" ? "text-amber-300" : "text-emerald-300")}><Dot tone={["DETECTED", "INVALID", "FAILED"].includes(a.result) ? "red" : a.result === "WARNING" ? "amber" : "green"} />{a.result}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Section>
+
+      {customOpen && (
         <TamperDialog
           open
-          onClose={() => setTamperOpen(false)}
+          onClose={() => setCustomOpen(false)}
           data={record.data}
           fields={fields}
           defaultField="ownerName"
-          suggest={(f, cur) => (f === "ownerName" && cur === "Ravi Kumar" ? "Raj Kumar" : f === "area" ? cur.replace(/^[\d.]+/, (n) => String(Number(n) * 4)) : "")}
-          onSubmit={(input) => tamper.run(input)}
-          pending={tamper.pending}
-          error={tamper.error}
+          suggest={(f, cur) => (f === "ownerName" ? forgedOwner(cur) : f === "area" ? cur.replace(/^[\d.]+/, (n) => String(Number(n) * 4)) : "")}
+          onSubmit={(input) => tamperCustom.run(input)}
+          pending={tamperCustom.pending}
+          error={tamperCustom.error}
         />
       )}
+    </div>
+  );
+}
+
+function StateRow({ label, value, ok, okText, badText }: { label: string; value: React.ReactNode; ok?: "pass" | "fail" | "warn"; okText: string; badText: string }) {
+  const tone = ok === "fail" ? "red" : ok === "warn" ? "amber" : ok === "pass" ? "green" : "slate";
+  return (
+    <div className="grid grid-cols-[130px_1fr_auto] items-center gap-3 px-4 py-2.5">
+      <dt className="text-slate-400">{label}</dt>
+      <dd className="min-w-0 truncate">{value}</dd>
+      <dd className={cx("flex items-center gap-2 text-right font-semibold", tone === "red" ? "text-red-300" : tone === "green" ? "text-emerald-300" : tone === "amber" ? "text-amber-300" : "text-slate-500")}>
+        <Dot tone={tone} />{ok ? (ok === "fail" ? badText : okText) : "…"}
+      </dd>
     </div>
   );
 }

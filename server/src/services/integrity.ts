@@ -106,6 +106,14 @@ export async function dashboard() {
   const activity = (db.prepare(`SELECT substr(timestamp, 1, 10) AS day, COUNT(*) AS n FROM ledger_blocks
       WHERE timestamp >= ? GROUP BY day ORDER BY day`).all(new Date(Date.now() - 13 * 864e5).toISOString().slice(0, 10)) as { day: string; n: number }[]).map((r) => ({ ...r }));
 
+  const recentActivity = (db.prepare(`SELECT a.id, a.timestamp, a.actor, a.action, a.record_id AS recordId, a.result,
+      COALESCE(r.record_type, 'SUPPLY_EVENT') AS recordType, COALESCE(r.algorithm, e.algorithm) AS algorithm,
+      COALESCE(r.integrity_status, e.integrity_status) AS integrityStatus, e.product_id AS productId
+    FROM audit_logs a LEFT JOIN records r ON r.id = a.record_id LEFT JOIN supply_chain_events e ON e.id = a.record_id
+    WHERE a.action IN ('CREATE_RECORD','VERIFY_RECORD','VERIFY_PROVENANCE','SUPPLY_EVENT','TAMPER_DETECTED','TAMPER_ATTEMPT','PQC_MIGRATION','RESTORE_ORIGINAL')
+      AND a.record_id IS NOT NULL AND (r.id IS NOT NULL OR e.id IS NOT NULL)
+    ORDER BY a.id DESC LIMIT 10`).all() as Record<string, unknown>[]).map((r) => ({ ...r }));
+
   return {
     metrics: {
       totalRecords: landRecords + products + events,
@@ -129,6 +137,7 @@ export async function dashboard() {
     recent: listRecords({ limit: 8 }).records,
     alerts: alerts.slice(0, 8),
     recentAudit: listAudit({ limit: 8 }).entries,
+    recentActivity,
     activity,
     lastScan: getState<ScanSummary>("lastScan") ?? null,
   };

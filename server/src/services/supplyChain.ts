@@ -237,8 +237,9 @@ export function verifyProductChain(productId: string, chain: ChainReport = verif
   };
 }
 
-export function verifyProduct(productId: string, actor = "Verifier") {
+export function verifyProduct(productId: string, actor = "Verifier", opts: { passive?: boolean } = {}) {
   const result = verifyProductChain(productId);
+  if (opts.passive) return result;
   const failedSteps = result.events.filter((e) => e.verdict === "TAMPERED").map((e) => e.entityId);
   logAudit({
     actor,

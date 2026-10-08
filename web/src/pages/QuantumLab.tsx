@@ -1,44 +1,56 @@
-import { AlertTriangle, Atom, BookOpen, Cpu, ExternalLink, Play, Server, ShieldCheck, Split, Trash2 } from "lucide-react";
+import { AlertTriangle, ExternalLink, Loader2, Play, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Button, Card, cx, Empty, ErrorState, Hash, InlineError, KV, Loading, PageHeader, Pill } from "../components/ui";
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Button, cx, Dot, Empty, ErrorState, Hash, InlineError, KV, Loading, PageHeader, Pill, Section } from "../components/ui";
 import { api, ApiError } from "../lib/api";
 import { formatDateTime, timeAgo } from "../lib/format";
 import { useAction, useApi } from "../lib/hooks";
 
 interface QStatus {
   online: boolean;
-  separation: string;
   versions: { qiskit: string; qiskitIbmRuntime: string; qiskitAer: string };
   ibm: { configured: boolean; source: string | null; channel: string; instanceConfigured: boolean; preferredBackend: string | null };
   targets: Record<string, { label: string; kind: string; description: string }>;
 }
 interface QCircuit {
   id: string; name: string; short: string; category: string; threatLink: string; explanation: string; honesty: string;
-  references: { label: string; url: string }[]; qubits: number; depth: number; ops: Record<string, number>; diagram: string; qasm: string | null;
-  idealDistribution: Record<string, number>;
+  references: { label: string; url: string }[]; qubits: number; depth: number; ops: Record<string, number>; diagram: string; idealDistribution: Record<string, number>;
 }
-interface ShorRow { bitstring: string; count: number; measured: number; phase: string; periodCandidate: number; periodValid: boolean; factors: number[] | null }
+interface ShorRow { bitstring: string; count: number; phase: string; periodCandidate: number; periodValid: boolean; factors: number[] | null }
 interface QJob {
-  id: string; circuit: string; circuitName: string; target: "ideal" | "noisy" | "ibm"; targetKind: string; targetLabel: string; backend: string | null;
-  shots: number; status: string; submittedAt: string; completedAt?: string; ibmJobId: string | null; counts: Record<string, number> | null;
+  id: string; circuit: string; circuitName: string; target: "ideal" | "noisy" | "ibm"; targetLabel: string; backend: string | null;
+  shots: number; status: string; submittedAt: string; ibmJobId: string | null; counts: Record<string, number> | null;
   analysis: { headline: string; interpretation: string; outcomes?: ShorRow[] } | null;
-  transpiled: { depth: number; size: number; twoQubitGates: number; physicalQubits: number[] | null } | null;
+  transpiled: { depth: number; twoQubitGates: number; physicalQubits: number[] | null } | null;
   error: string | null; hellingerFidelity?: number | null; executionSeconds?: number; ibmUsage?: { quantumSeconds?: number }; lastPollError?: string;
 }
-interface Backend { name: string; qubits: number; pendingJobs: number | null; statusMsg: string }
+interface Backend { name: string; qubits: number; pendingJobs: number | null }
 
 const FINAL = new Set(["DONE", "ERROR", "CANCELLED"]);
+const TARGET_NAME = { ibm: "IBM Quantum hardware", noisy: "Simulator with IBM device noise", ideal: "Ideal simulator" } as const;
+
+function phase(job: QJob | undefined, submitting: boolean): { text: string; tone: "slate" | "amber" | "green" | "red" } {
+  if (submitting) return { text: "Submitting job…", tone: "amber" };
+  if (!job) return { text: "Ready", tone: "slate" };
+  if (job.status === "DONE") return { text: "Completed", tone: "green" };
+  if (job.status === "ERROR" || job.status === "CANCELLED") return { text: "Failed", tone: "red" };
+  if (job.status === "RUNNING") return { text: job.target === "ibm" ? "Running on quantum hardware…" : "Running simulation…", tone: "amber" };
+  return { text: job.target === "ibm" ? "Queued at IBM Quantum…" : "Submitting job…", tone: "amber" };
+}
 
 export default function QuantumLab() {
   const status = useApi(() => api.get<QStatus>("/quantum/status"));
   const circuits = useApi(() => api.get<{ circuits: QCircuit[] }>("/quantum/circuits"));
   const jobs = useApi(() => api.get<{ jobs: QJob[] }>("/quantum/jobs"));
-  const [circuitId, setCircuitId] = useState("shor15");
-  const [target, setTarget] = useState<"ideal" | "noisy" | "ibm">("noisy");
-  const [shots, setShots] = useState(2048);
+  const [circuitId, setCircuitId] = useState("ghz");
+  const [target, setTarget] = useState<"ideal" | "noisy" | "ibm">("ibm");
+  const [shots, setShots] = useState(1024);
   const [backend, setBackend] = useState("");
   const [backends, setBackends] = useState<Backend[] | null>(null);
   const [selectedJob, setSelectedJob] = useState<string | null>(null);
+
+  const ibmReady = !!status.data?.ibm.configured;
+  useEffect(() => { if (status.data && !status.data.ibm.configured) setTarget((t) => (t === "ibm" ? "noisy" : t)); }, [status.data]);
 
   const loadBackends = useAction(async () => setBackends((await api.get<{ backends: Backend[] }>("/quantum/ibm/backends")).backends));
   const submit = useAction(async () => {
@@ -48,7 +60,7 @@ export default function QuantumLab() {
   });
   const remove = useAction(async (id: string) => { await api.del(`/quantum/jobs/${id}`); if (selectedJob === id) setSelectedJob(null); await jobs.reload(); });
 
-  // Poll unfinished jobs (hardware jobs refresh their status from IBM Quantum).
+  // Poll unfinished jobs; hardware jobs refresh their status from IBM Quantum.
   const pending = jobs.data?.jobs.filter((j) => !FINAL.has(j.status)) ?? [];
   useEffect(() => {
     if (!pending.length) return;
@@ -62,172 +74,126 @@ export default function QuantumLab() {
   const circuit = circuits.data?.circuits.find((c) => c.id === circuitId);
   const job = jobs.data?.jobs.find((j) => j.id === selectedJob) ?? jobs.data?.jobs.find((j) => j.circuit === circuitId && j.status === "DONE");
   const offline = status.error instanceof ApiError && status.error.status === 503;
-  const ibmReady = !!status.data?.ibm.configured;
+  const ph = phase(job && job.id === selectedJob ? job : undefined, submit.pending);
+  const running = submit.pending || (job && !FINAL.has(job.status) && job.id === selectedJob);
 
   return (
     <div>
-      <PageHeader
-        eyebrow="IBM Quantum · Qiskit Runtime"
-        title={<span className="flex items-center gap-3"><Atom className="h-7 w-7 text-quantum-400" /> Quantum Threat Lab</span>}
-        description="Real quantum circuits, executable on IBM Quantum hardware, that illustrate why today's public-key signatures need a post-quantum successor. This lab demonstrates the threat model. It does not break any cryptography."
-      />
+      <PageHeader title="Quantum Lab" description="IBM Quantum integration. Run a real quantum workload through IBM Quantum hardware." />
 
-      <div className="mb-6 grid gap-0 overflow-hidden rounded-2xl border border-white/[0.08] md:grid-cols-[1fr_auto_1fr]">
-        <div className="bg-gradient-to-br from-quantum-500/15 to-transparent p-5">
-          <div className="label flex items-center gap-1.5 text-quantum-400"><Atom className="h-3.5 w-3.5" /> Quantum layer (this page)</div>
-          <div className="mt-2 text-base font-semibold text-white">Threat demonstration on IBM Quantum</div>
-          <p className="mt-1.5 text-sm text-slate-300">Qiskit circuits run on IBM quantum processors or local simulators. They show the algorithms (Shor, Grover) that motivate post-quantum cryptography.</p>
-          <p className="mt-2 text-xs font-medium text-quantum-400">Never receives records, signatures or keys.</p>
-        </div>
-        <div className="flex items-center justify-center border-y border-white/[0.06] bg-ink-900/80 px-4 py-3 md:border-x md:border-y-0">
-          <div className="flex flex-col items-center gap-1 text-center text-[10px] font-semibold uppercase tracking-widest text-slate-500"><Split className="h-5 w-5" />Fully<br />separate</div>
-        </div>
-        <div className="bg-gradient-to-bl from-brand-500/15 to-transparent p-5">
-          <div className="label flex items-center gap-1.5 text-brand-300"><ShieldCheck className="h-3.5 w-3.5" /> Security layer (rest of QuantumShield)</div>
-          <div className="mt-2 text-base font-semibold text-white">ML-DSA-65 signatures on classical servers</div>
-          <p className="mt-1.5 text-sm text-slate-300">Every record is signed and verified with ML-DSA (FIPS 204). It needs no quantum computer and is designed to resist attacks from one.</p>
-          <p className="mt-2 text-xs font-medium text-brand-300">Unaffected if the quantum service is offline.</p>
-        </div>
+      <div className="mb-9 rounded-lg border border-ink-700 bg-ink-900 px-5 py-4">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-400">Quantum computation demonstration</div>
+        <p className="mt-1.5 max-w-4xl text-[14px] leading-relaxed text-slate-300">
+          This workload demonstrates execution on IBM Quantum hardware. The post-quantum security layer uses ML-DSA independently of the quantum execution.
+          Nothing here breaks RSA, ECC or ML-DSA, and the quantum service never receives records, signatures or keys.
+        </p>
       </div>
 
       {status.loading ? <Loading label="Connecting to quantum service…" /> : offline || status.error ? (
-        <Card>
+        <div className="space-y-3">
           <ErrorState error={status.error!} onRetry={status.reload} />
-          <p className="mt-4 text-center text-xs text-slate-400">Start it with <code className="rounded bg-ink-950 px-1.5 py-0.5 font-mono text-slate-200">npm run dev:quantum</code>. The ML-DSA security layer keeps working without it.</p>
-        </Card>
+          <p className="text-[13px] text-slate-400">Start the service with <code className="rounded bg-ink-800 px-1.5 py-0.5 font-mono text-slate-200">npm run dev:quantum</code>. The ML-DSA security layer keeps working without it.</p>
+        </div>
       ) : (
         <>
-          <div className="mb-6 grid gap-4 md:grid-cols-3">
-            <div className="glass rounded-xl p-4">
-              <div className="label">Quantum SDK</div>
-              <div className="mt-2 text-sm text-slate-200">Qiskit <span className="font-mono">{status.data!.versions.qiskit}</span> · Runtime <span className="font-mono">{status.data!.versions.qiskitIbmRuntime}</span> · Aer <span className="font-mono">{status.data!.versions.qiskitAer}</span></div>
-            </div>
-            <div className={cx("glass rounded-xl p-4", ibmReady && "glow-violet")}>
-              <div className="label">IBM Quantum account</div>
-              <div className="mt-2 flex items-center gap-2 text-sm">
-                {ibmReady ? <Pill tone="violet">CONFIGURED · {status.data!.ibm.source}</Pill> : <Pill tone="amber">NOT CONFIGURED</Pill>}
-                <span className="text-xs text-slate-500">{status.data!.ibm.channel}</span>
-              </div>
-              {!ibmReady && <p className="mt-2 text-xs text-slate-400">Add <code className="font-mono text-slate-300">IBM_QUANTUM_TOKEN</code> (and <code className="font-mono text-slate-300">IBM_QUANTUM_INSTANCE</code>) to <code className="font-mono">.env</code> and restart to run on hardware.</p>}
-            </div>
-            <div className="glass rounded-xl p-4">
-              <div className="label">IBM backends</div>
-              {backends ? (
-                <div className="mt-2 max-h-20 space-y-1 overflow-y-auto text-xs">
-                  {backends.length === 0 ? <span className="text-slate-400">No operational backends visible to this account.</span> : backends.map((b) => (
-                    <div key={b.name} className="flex justify-between text-slate-300"><span className="font-mono">{b.name}</span><span className="text-slate-500">{b.qubits}q · {b.pendingJobs ?? "?"} queued</span></div>
-                  ))}
-                </div>
-              ) : (
-                <Button size="sm" className="mt-2" disabled={!ibmReady} loading={loadBackends.pending} onClick={() => loadBackends.run()} icon={<Server className="h-3.5 w-3.5" />}>Load backends</Button>
-              )}
-              {loadBackends.error && <p className="mt-2 text-xs text-red-300">{loadBackends.error.message}</p>}
-            </div>
-          </div>
-
           {circuits.error ? <ErrorState error={circuits.error} onRetry={circuits.reload} /> : !circuits.data ? <Loading /> : (
             <>
-              <div className="mb-4 flex flex-wrap gap-2">
+              <div role="tablist" aria-label="Circuit" className="mb-7 flex flex-wrap gap-x-7 border-b border-ink-700">
                 {circuits.data.circuits.map((c) => (
-                  <button key={c.id} onClick={() => { setCircuitId(c.id); setSelectedJob(null); }} className={cx("rounded-xl border px-4 py-2.5 text-left transition", circuitId === c.id ? "border-quantum-500/60 bg-quantum-500/15 text-white" : "border-white/10 bg-white/[0.02] text-slate-300 hover:border-white/20")}>
-                    <div className="text-sm font-semibold">{c.name}</div>
-                    <div className="text-[11px] text-slate-400">{c.category} · {c.qubits} qubits</div>
+                  <button key={c.id} role="tab" aria-selected={circuitId === c.id} onClick={() => { setCircuitId(c.id); setSelectedJob(null); }} className={cx("-mb-px border-b-2 pb-3 text-[14px] font-medium transition-colors", circuitId === c.id ? "border-brand-500 text-white" : "border-transparent text-slate-400 hover:text-slate-200")}>
+                    {c.name}<span className="ml-2 text-[11px] font-normal text-slate-500">{c.qubits} qubits</span>
                   </button>
                 ))}
               </div>
 
               {circuit && (
-                <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-                  <div className="space-y-6">
-                    <Card title={circuit.name} subtitle={circuit.short} icon={<Atom className="h-4 w-4 text-quantum-400" />} actions={<Pill tone="violet">{circuit.category}</Pill>}>
-                      <p className="text-sm leading-relaxed text-slate-300">{circuit.explanation}</p>
-                      <div className="mt-4 rounded-xl border border-brand-500/25 bg-brand-500/[0.06] p-4">
-                        <div className="label mb-1 text-brand-300">Why it matters for record security</div>
-                        <p className="text-sm text-slate-300">{circuit.threatLink}</p>
-                      </div>
-                      <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/[0.06] p-4">
-                        <div className="label mb-1 flex items-center gap-1.5 text-amber-300"><AlertTriangle className="h-3.5 w-3.5" /> Reality check</div>
-                        <p className="text-sm leading-relaxed text-amber-50/85">{circuit.honesty}</p>
-                      </div>
-                      <div className="mt-5">
-                        <div className="mb-2 flex items-center justify-between">
-                          <span className="label">Circuit (Qiskit)</span>
-                          <span className="text-[11px] text-slate-500">{circuit.qubits} qubits · depth {circuit.depth} · {Object.entries(circuit.ops).map(([k, v]) => `${v} ${k}`).join(", ")}</span>
-                        </div>
-                        <pre className="overflow-x-auto rounded-xl border border-white/[0.06] bg-ink-950/80 p-4 font-mono text-[11px] leading-[1.35] text-quantum-400/90">{circuit.diagram}</pre>
+                <div className="grid gap-x-12 gap-y-10 xl:grid-cols-[minmax(0,1fr)_360px]">
+                  <div className="space-y-10">
+                    <Section title="Circuit" description={`${circuit.short} · ${circuit.qubits} qubits · depth ${circuit.depth} · ${Object.entries(circuit.ops).map(([k, v]) => `${v} ${k}`).join(", ")}`}>
+                      <pre className="overflow-x-auto rounded-lg border border-ink-700 bg-ink-900 p-4 font-mono text-[12px] leading-[1.35] text-slate-200">{circuit.diagram}</pre>
+                      <p className="mt-4 max-w-3xl text-[14px] leading-relaxed text-slate-300">{circuit.explanation}</p>
+                      <div className="mt-4 grid gap-4 md:grid-cols-2">
+                        <div className="rounded-lg border border-ink-700 p-4"><div className="label mb-1">Relevance to record security</div><p className="text-[13px] leading-relaxed text-slate-300">{circuit.threatLink}</p></div>
+                        <div className="rounded-lg border border-amber-500/30 bg-amber-500/[0.05] p-4"><div className="label mb-1 flex items-center gap-1.5 text-amber-300"><AlertTriangle className="h-3.5 w-3.5" /> Limits of this demonstration</div><p className="text-[13px] leading-relaxed text-slate-300">{circuit.honesty}</p></div>
                       </div>
                       {circuit.references.length > 0 && (
-                        <div className="mt-4 space-y-1">
-                          <div className="label flex items-center gap-1.5"><BookOpen className="h-3.5 w-3.5" /> References</div>
-                          {circuit.references.map((r) => <a key={r.url} href={r.url} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs text-brand-300 hover:underline">{r.label} <ExternalLink className="h-3 w-3" /></a>)}
-                        </div>
+                        <ul className="mt-4 space-y-1">
+                          {circuit.references.map((r) => <li key={r.url}><a href={r.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[13px] text-brand-300 hover:underline">{r.label}<ExternalLink className="h-3 w-3" /></a></li>)}
+                        </ul>
                       )}
-                    </Card>
+                    </Section>
 
-                    <Card title="Results" subtitle={job ? `${job.circuitName} · ${job.targetLabel}` : "Run the circuit to see measured outcomes"} icon={<Cpu className="h-4 w-4" />}>
-                      {!job ? <Empty icon={<Play className="h-8 w-8 text-quantum-400" />} title="No results yet" description="Choose an execution target and run the circuit. Ideal probabilities are shown for comparison." /> : <JobResult job={job} ideal={circuit.idealDistribution} />}
-                    </Card>
+                    <Section title="Measurement results" description={job ? `${job.circuitName} · ${job.targetLabel}` : "Run the circuit to see measured outcomes against the ideal distribution."}>
+                      {!job ? <Empty icon={<Play className="h-7 w-7" />} title="No results yet" description="Choose an execution target and run the circuit." /> : <JobResult job={job} ideal={circuit.idealDistribution} />}
+                    </Section>
                   </div>
 
-                  <div className="space-y-6">
-                    <Card title="Execute" subtitle="Transpiled with Qiskit's preset pass manager for the target" icon={<Play className="h-4 w-4 text-quantum-400" />}>
-                      <div className="space-y-2">
-                        {(["ideal", "noisy", "ibm"] as const).map((t) => {
-                          const info = status.data!.targets[t];
-                          const disabled = t === "ibm" && !ibmReady;
-                          return (
-                            <label key={t} className={cx("flex cursor-pointer gap-3 rounded-xl border p-3 transition", disabled && "cursor-not-allowed opacity-50", target === t ? (t === "ibm" ? "border-quantum-500/60 bg-quantum-500/10" : "border-brand-500/50 bg-brand-500/[0.07]") : "border-white/10 hover:border-white/20")}>
-                              <input type="radio" disabled={disabled} className="mt-1 accent-violet-500" checked={target === t} onChange={() => setTarget(t)} />
-                              <span>
-                                <span className="flex items-center gap-2 text-sm font-semibold text-white">{info.label} <Pill tone={t === "ibm" ? "violet" : "slate"}>{t === "ibm" ? "REAL HARDWARE" : "SIMULATION"}</Pill></span>
-                                <span className="mt-0.5 block text-xs text-slate-400">{info.description}</span>
-                                {disabled && <span className="mt-1 block text-xs text-amber-300">Requires IBM_QUANTUM_TOKEN in .env</span>}
-                              </span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                      {target === "ibm" && (
-                        <div className="mt-3">
-                          <label className="block text-xs font-medium text-slate-300">Backend</label>
-                          <select className="input mt-1" value={backend} onChange={(e) => setBackend(e.target.value)}>
-                            <option value="">{status.data!.ibm.preferredBackend ? `${status.data!.ibm.preferredBackend} (from .env)` : "Least busy available backend"}</option>
-                            {backends?.map((b) => <option key={b.name} value={b.name}>{b.name} · {b.qubits} qubits · {b.pendingJobs ?? "?"} queued</option>)}
-                          </select>
-                        </div>
-                      )}
-                      <div className="mt-3">
-                        <label className="block text-xs font-medium text-slate-300">Shots</label>
-                        <select className="input mt-1" value={shots} onChange={(e) => setShots(Number(e.target.value))}>{[1024, 2048, 4096].map((s) => <option key={s} value={s}>{s.toLocaleString()}</option>)}</select>
-                      </div>
-                      <div className="mt-4"><InlineError error={submit.error} /></div>
-                      <Button variant="quantum" size="lg" className="mt-2 w-full" loading={submit.pending} onClick={() => submit.run()} icon={<Play className="h-4 w-4" />}>
-                        {target === "ibm" ? "Submit to IBM Quantum" : "Run circuit"}
-                      </Button>
-                      {target === "ibm" && <p className="mt-2 text-[11px] text-slate-500">Uses your IBM Quantum allocation. Jobs can wait in a queue; status updates automatically.</p>}
-                    </Card>
+                  <div className="space-y-10">
+                    <Section title="Run">
+                      <dl className="divide-y divide-ink-800 border-y border-ink-800 text-[13px]">
+                        <Row k="Platform">IBM Quantum</Row>
+                        <Row k="Connection">{ibmReady ? <span className="flex items-center gap-2 text-slate-100"><Dot tone="green" />Connected</span> : <span className="flex items-center gap-2 text-amber-300"><Dot tone="amber" />Not configured</span>}</Row>
+                        <Row k="Backend">{target === "ibm" ? (backend || status.data!.ibm.preferredBackend || "Least busy available") : target === "noisy" ? "fake_torino (simulated)" : "aer_simulator"}</Row>
+                        <Row k="Shots">
+                          <select className="input h-7 w-24 py-0 text-[13px]" aria-label="Shots" value={shots} onChange={(e) => setShots(Number(e.target.value))}>{[1024, 2048, 4096].map((s) => <option key={s} value={s}>{s.toLocaleString()}</option>)}</select>
+                        </Row>
+                        <Row k="Job status"><span className={cx("flex items-center gap-2 font-medium", ph.tone === "green" ? "text-emerald-300" : ph.tone === "red" ? "text-red-300" : ph.tone === "amber" ? "text-amber-300" : "text-slate-200")}>{running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Dot tone={ph.tone} />}{ph.text}</span></Row>
+                      </dl>
 
-                    <Card title="Job history" bodyClass="p-0">
-                      {!jobs.data?.jobs.length ? <Empty title="No jobs yet" /> : (
-                        <ul className="max-h-[420px] divide-y divide-white/[0.05] overflow-y-auto">
+                      <fieldset className="mt-5">
+                        <legend className="label mb-2">Execution target</legend>
+                        <div className="space-y-1.5">
+                          {(["ibm", "noisy", "ideal"] as const).map((t) => {
+                            const disabled = t === "ibm" && !ibmReady;
+                            return (
+                              <label key={t} className={cx("flex cursor-pointer items-start gap-3 rounded-md border px-3 py-2.5 transition-colors", disabled && "cursor-not-allowed opacity-45", target === t ? "border-brand-500/60 bg-brand-500/[0.07]" : "border-ink-700 hover:border-ink-600")}>
+                                <input type="radio" name="target" disabled={disabled} className="mt-1 accent-blue-500" checked={target === t} onChange={() => setTarget(t)} />
+                                <span className="min-w-0">
+                                  <span className="flex flex-wrap items-center gap-2 text-[13.5px] font-medium text-slate-100">{TARGET_NAME[t]}{t === "ibm" ? <Pill tone="blue">Real hardware</Pill> : <Pill>Simulation</Pill>}</span>
+                                  <span className="mt-0.5 block text-xs leading-snug text-slate-500">{t === "ibm" ? (disabled ? "Add IBM_QUANTUM_TOKEN to .env to enable." : "Submits to a real IBM quantum processor. Jobs may queue.") : t === "noisy" ? "Runs locally with the noise profile of IBM Torino. Not real hardware." : "Noise-free reference run on this machine."}</span>
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                        {target === "ibm" && (
+                          <div className="mt-3 flex items-center gap-2">
+                            <select className="input h-8 flex-1 py-0 text-[13px]" aria-label="IBM backend" value={backend} onChange={(e) => setBackend(e.target.value)}>
+                              <option value="">{status.data!.ibm.preferredBackend ? `${status.data!.ibm.preferredBackend} (from .env)` : "Least busy backend"}</option>
+                              {backends?.map((b) => <option key={b.name} value={b.name}>{b.name} · {b.qubits} qubits · {b.pendingJobs ?? "?"} queued</option>)}
+                            </select>
+                            <Button size="sm" onClick={() => loadBackends.run()} loading={loadBackends.pending}>{backends ? "Refresh" : "Load backends"}</Button>
+                          </div>
+                        )}
+                        {loadBackends.error && <p className="mt-2 text-xs text-red-300">{loadBackends.error.message}</p>}
+                      </fieldset>
+
+                      <div className="mt-5"><InlineError error={submit.error} /></div>
+                      <Button variant="primary" size="lg" className="mt-2 w-full" loading={!!running} disabled={!!running} onClick={() => submit.run()} icon={<Play className="h-4 w-4" />}>
+                        {running ? ph.text.replace("…", "") : target === "ibm" ? "Run on IBM Quantum" : "Run simulation"}
+                      </Button>
+                      {target === "ibm" && <p className="mt-2 text-xs text-slate-500">Uses part of your IBM Quantum allocation (a few seconds for this circuit). Status refreshes automatically.</p>}
+                    </Section>
+
+                    <Section title="Job history">
+                      {!jobs.data?.jobs.length ? <p className="text-[13px] text-slate-500">No jobs yet.</p> : (
+                        <ul className="max-h-[360px] divide-y divide-ink-800 overflow-y-auto border-y border-ink-800">
                           {jobs.data.jobs.map((j) => (
-                            <li key={j.id} className={cx("group flex cursor-pointer items-start justify-between gap-2 px-4 py-3 transition hover:bg-white/[0.03]", job?.id === j.id && "bg-quantum-500/[0.08]")} onClick={() => { setSelectedJob(j.id); setCircuitId(j.circuit); }}>
+                            <li key={j.id} className={cx("group flex cursor-pointer items-center justify-between gap-3 px-1 py-2.5 hover:bg-ink-900", job?.id === j.id && "bg-ink-900")} onClick={() => { setSelectedJob(j.id); setCircuitId(j.circuit); }}>
                               <div className="min-w-0">
-                                <div className="flex items-center gap-2 text-sm font-medium text-slate-100">{j.circuitName}</div>
-                                <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
-                                  <Pill tone={j.target === "ibm" ? "violet" : "slate"}>{j.target === "ibm" ? "IBM HW" : j.target === "noisy" ? "NOISY SIM" : "IDEAL SIM"}</Pill>
-                                  <span className="font-mono">{j.backend}</span> · {timeAgo(j.submittedAt)}
-                                </div>
+                                <div className="truncate text-[13px] font-medium text-slate-100">{j.circuitName}</div>
+                                <div className="text-[11px] text-slate-500">{j.target === "ibm" ? "IBM hardware" : j.target === "noisy" ? "Noisy simulator" : "Ideal simulator"} · {j.backend} · {timeAgo(j.submittedAt)}</div>
                               </div>
-                              <div className="flex items-center gap-1">
-                                <Pill tone={j.status === "DONE" ? "green" : j.status === "ERROR" || j.status === "CANCELLED" ? "red" : "amber"}>{j.status}</Pill>
-                                <button onClick={(e) => { e.stopPropagation(); remove.run(j.id); }} className="rounded p-1 text-slate-600 opacity-0 transition hover:text-red-300 group-hover:opacity-100" title="Delete job record"><Trash2 className="h-3.5 w-3.5" /></button>
+                              <div className="flex items-center gap-2">
+                                <span className={cx("flex items-center gap-1.5 text-xs font-medium", j.status === "DONE" ? "text-emerald-300" : j.status === "ERROR" || j.status === "CANCELLED" ? "text-red-300" : "text-amber-300")}><Dot tone={j.status === "DONE" ? "green" : j.status === "ERROR" || j.status === "CANCELLED" ? "red" : "amber"} />{j.status === "DONE" ? "Completed" : j.status.charAt(0) + j.status.slice(1).toLowerCase()}</span>
+                                <button onClick={(e) => { e.stopPropagation(); remove.run(j.id); }} className="rounded p-1 text-slate-600 opacity-0 hover:text-red-300 focus-visible:opacity-100 group-hover:opacity-100" aria-label="Delete job record"><Trash2 className="h-3.5 w-3.5" /></button>
                               </div>
                             </li>
                           ))}
                         </ul>
                       )}
-                    </Card>
+                      <p className="mt-3 text-[11px] text-slate-500">Qiskit {status.data!.versions.qiskit} · Runtime {status.data!.versions.qiskitIbmRuntime} · Aer {status.data!.versions.qiskitAer}</p>
+                    </Section>
                   </div>
                 </div>
               )}
@@ -236,108 +202,101 @@ export default function QuantumLab() {
         </>
       )}
 
-      <Card title="Scale reality check" subtitle="This demonstration vs. a cryptographically relevant quantum computer" className="mt-6">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead><tr className="text-left"><th className="label py-2 pr-4" /><th className="label py-2 pr-4 text-quantum-400">This lab (Shor, N = 15)</th><th className="label py-2 text-red-300">Breaking RSA-2048 (published estimate)</th></tr></thead>
-            <tbody className="divide-y divide-white/[0.05] text-slate-300">
-              <tr><td className="py-2.5 pr-4 text-xs text-slate-400">Number to factor</td><td className="py-2.5 pr-4">15 (4 bits)</td><td className="py-2.5">2048-bit modulus</td></tr>
-              <tr><td className="py-2.5 pr-4 text-xs text-slate-400">Qubits</td><td className="py-2.5 pr-4">7 physical, no error correction</td><td className="py-2.5">Fewer than one million noisy physical qubits, with error correction (Gidney, 2025)</td></tr>
-              <tr><td className="py-2.5 pr-4 text-xs text-slate-400">Runtime</td><td className="py-2.5 pr-4">Seconds</td><td className="py-2.5">Under a week of continuous operation (same estimate)</td></tr>
-              <tr><td className="py-2.5 pr-4 text-xs text-slate-400">Exists today?</td><td className="py-2.5 pr-4 text-emerald-300">Yes: runs on current IBM hardware</td><td className="py-2.5 text-amber-300">No: no such machine exists today</td></tr>
+      <Section title="Scale of the threat" description="This demonstration compared with a cryptographically relevant quantum computer" className="mt-14">
+        <div className="overflow-x-auto rounded-lg border border-ink-700">
+          <table className="w-full min-w-[640px] text-[13px]">
+            <thead className="border-b border-ink-700 bg-ink-900"><tr><th className="th" /><th className="th">This lab (Shor, N = 15)</th><th className="th">Breaking RSA-2048 (published estimate)</th></tr></thead>
+            <tbody className="divide-y divide-ink-800 text-slate-300">
+              <tr><td className="td text-slate-500">Number to factor</td><td className="td">15 (4 bits)</td><td className="td">2048-bit modulus</td></tr>
+              <tr><td className="td text-slate-500">Qubits</td><td className="td">7 physical, no error correction</td><td className="td">Under one million noisy physical qubits, error-corrected (Gidney, 2025)</td></tr>
+              <tr><td className="td text-slate-500">Runtime</td><td className="td">Seconds</td><td className="td">Under a week of continuous operation (same estimate)</td></tr>
+              <tr><td className="td text-slate-500">Available today</td><td className="td text-emerald-300">Yes, on current IBM hardware</td><td className="td text-amber-300">No such machine exists</td></tr>
             </tbody>
           </table>
         </div>
-        <p className="mt-4 text-sm leading-relaxed text-slate-300">
-          <span className="font-semibold text-white">Takeaway:</span> the threat is not today's machines, but records that must stay trustworthy for decades. Signatures made now with RSA/ECC could be forged once a large fault-tolerant quantum computer exists.
-          That is why QuantumShield signs with <span className="text-brand-300">ML-DSA</span> today. ML-DSA runs on ordinary servers and does not depend on this lab.
+        <p className="mt-4 max-w-4xl text-[14px] leading-relaxed text-slate-300">
+          The risk is not today's machines. It is records that must stay trustworthy for decades: signatures made now with RSA or ECC could be forged once a large fault-tolerant quantum computer exists.
+          That is why QuantumShield signs with ML-DSA today. ML-DSA runs on ordinary servers and does not depend on this lab.
         </p>
-      </Card>
+      </Section>
     </div>
   );
 }
 
+function Row({ k, children }: { k: string; children: React.ReactNode }) {
+  return <div className="flex items-center justify-between gap-4 py-2.5"><dt className="text-slate-400">{k}</dt><dd className="min-w-0 text-right text-slate-100">{children}</dd></div>;
+}
+
 function JobResult({ job, ideal }: { job: QJob; ideal: Record<string, number> }) {
-  const keys = useMemo(() => {
-    const all = new Set([...Object.keys(ideal), ...Object.keys(job.counts ?? {})]);
-    return [...all].sort();
-  }, [ideal, job.counts]);
   const total = job.counts ? Object.values(job.counts).reduce((a, b) => a + b, 0) : 0;
-  const measured = (k: string) => (job.counts && total ? (job.counts[k] ?? 0) / total : 0);
-  const max = Math.max(0.01, ...keys.map((k) => Math.max(measured(k), ideal[k] ?? 0)));
-  const shown = keys.length > 16 ? keys.filter((k) => (ideal[k] ?? 0) > 0 || measured(k) > 0.01) : keys;
+  const data = useMemo(() => {
+    const keys = new Set([...Object.keys(ideal), ...Object.keys(job.counts ?? {})]);
+    const rows = [...keys].sort().map((k) => ({ state: k, measured: total ? +(((job.counts?.[k] ?? 0) / total) * 100).toFixed(2) : 0, ideal: +((ideal[k] ?? 0) * 100).toFixed(2) }));
+    return rows.length > 16 ? rows.filter((r) => r.ideal > 0 || r.measured > 1) : rows;
+  }, [ideal, job.counts, total]);
 
   return (
-    <div className="space-y-5">
-      <div className={cx("flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3", job.target === "ibm" ? "glow-violet border-quantum-500/50 bg-quantum-500/10" : "border-white/10 bg-white/[0.03]")}>
+    <div className="space-y-6">
+      <div className={cx("flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3", job.target === "ibm" ? "border-brand-500/40 bg-brand-500/[0.05]" : "border-ink-700 bg-ink-900")}>
         <div>
-          <div className={cx("text-xs font-bold uppercase tracking-widest", job.target === "ibm" ? "text-quantum-400" : "text-slate-400")}>
-            {job.target === "ibm" ? "Executed on real IBM Quantum hardware" : job.target === "noisy" ? "Local simulation with IBM device noise model" : "Local ideal simulation"}
+          <div className={cx("text-[11px] font-semibold uppercase tracking-[0.1em]", job.target === "ibm" ? "text-brand-300" : "text-slate-400")}>
+            {job.target === "ibm" ? "Executed on IBM Quantum hardware" : job.target === "noisy" ? "Local simulation with IBM device noise model" : "Local ideal simulation"}
           </div>
-          <div className="mt-0.5 font-mono text-sm text-white">{job.backend}</div>
+          <div className="mt-0.5 font-mono text-[14px] text-white">{job.backend}</div>
         </div>
         <div className="text-right text-xs text-slate-400">
-          {job.ibmJobId && <div className="flex items-center justify-end gap-1">IBM job ID <Hash value={job.ibmJobId} n={8} /></div>}
-          <div>{job.shots.toLocaleString()} shots · submitted {formatDateTime(job.submittedAt)}</div>
+          {job.ibmJobId && <div className="flex items-center justify-end gap-1.5">IBM job ID <Hash value={job.ibmJobId} n={8} /></div>}
+          <div>{job.shots.toLocaleString()} shots · {formatDateTime(job.submittedAt)}</div>
         </div>
       </div>
 
       {job.status !== "DONE" ? (
         job.status === "ERROR" || job.status === "CANCELLED" ? <ErrorState error={new Error(job.error ?? `Job ${job.status.toLowerCase()}`)} /> : (
-          <div className="scanline rounded-xl border border-quantum-500/30 bg-quantum-500/[0.05] py-10 text-center text-sm text-slate-300">
-            Status: <span className="font-semibold text-quantum-400">{job.status}</span>{job.target === "ibm" && " · waiting for IBM Quantum (polling every 5 s)"}
-            {job.lastPollError && <div className="mt-2 text-xs text-red-300">Last poll error: {job.lastPollError}</div>}
+          <div className="flex items-center gap-3 rounded-lg border border-ink-700 px-4 py-6 text-[14px] text-slate-300" role="status">
+            <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+            {job.target === "ibm" ? (job.status === "RUNNING" ? "Running on quantum hardware…" : "Waiting in the IBM Quantum queue…") : "Running simulation…"}
+            {job.lastPollError && <span className="text-xs text-red-300">Last poll error: {job.lastPollError}</span>}
           </div>
         )
       ) : (
         <>
           {job.analysis && (
-            <div className="rounded-xl border border-white/[0.08] bg-ink-900/60 p-4">
-              <div className="text-base font-semibold text-white">{job.analysis.headline}</div>
-              <p className="mt-1 text-xs leading-relaxed text-slate-400">{job.analysis.interpretation}</p>
+            <div>
+              <div className="text-[17px] font-semibold text-white">{job.analysis.headline}</div>
+              <p className="mt-1 max-w-3xl text-[13px] leading-relaxed text-slate-400">{job.analysis.interpretation}</p>
             </div>
           )}
-          <div>
-            <div className="mb-2 flex items-center gap-4 text-[11px] text-slate-400">
-              <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-quantum-500" /> Measured</span>
-              <span className="flex items-center gap-1.5"><span className="h-0.5 w-3 bg-cyan-300" /> Ideal probability</span>
-              {job.hellingerFidelity != null && <span className="ml-auto">Hellinger fidelity vs ideal: <span className="font-semibold text-white">{(job.hellingerFidelity * 100).toFixed(1)}%</span></span>}
-            </div>
-            <div className="flex h-56 items-end gap-1 rounded-xl border border-white/[0.06] bg-ink-950/60 p-3 pt-6">
-              {shown.map((k) => {
-                const m = measured(k), i = ideal[k] ?? 0;
-                return (
-                  <div key={k} className="group relative flex h-full flex-1 flex-col items-center justify-end">
-                    <div className="absolute -top-5 text-[10px] text-slate-300 opacity-0 transition group-hover:opacity-100">{(m * 100).toFixed(1)}%</div>
-                    <div className="relative flex w-full flex-1 items-end justify-center">
-                      <div className="w-full max-w-10 rounded-t bg-gradient-to-t from-quantum-500/70 to-quantum-400" style={{ height: `${(m / max) * 100}%` }} />
-                      {i > 0 && <div className="absolute left-0 right-0 mx-auto h-0.5 max-w-12 bg-cyan-300 shadow-[0_0_6px_rgba(103,232,249,0.9)]" style={{ bottom: `${(i / max) * 100}%` }} />}
-                    </div>
-                    <div className="mt-1.5 font-mono text-[10px] text-slate-400">{k}</div>
-                  </div>
-                );
-              })}
-            </div>
+          <div className="h-64" role="img" aria-label="Measured versus ideal outcome probabilities">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data} margin={{ top: 8, right: 8, left: -12, bottom: 0 }} barGap={2}>
+                <CartesianGrid vertical={false} stroke="#202b38" />
+                <XAxis dataKey="state" stroke="#667383" tick={{ fontSize: 12, fontFamily: "ui-monospace, monospace" }} tickLine={false} axisLine={{ stroke: "#202b38" }} />
+                <YAxis unit="%" stroke="#667383" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                <Tooltip cursor={{ fill: "rgba(255,255,255,0.04)" }} contentStyle={{ background: "#0d131c", border: "1px solid #202b38", borderRadius: 6, fontSize: 12 }} labelStyle={{ color: "#9aa6b2", fontFamily: "ui-monospace, monospace" }} formatter={(v) => `${v}%`} />
+                <Legend iconType="square" wrapperStyle={{ fontSize: 12, color: "#9aa6b2" }} />
+                <Bar dataKey="measured" name="Measured" fill="#2f7bff" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+                <Bar dataKey="ideal" name="Ideal" fill="#4b5866" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
+          <dl className="grid gap-x-8 gap-y-3 border-y border-ink-800 py-4 sm:grid-cols-4">
+            <KV label="Fidelity vs ideal">{job.hellingerFidelity != null ? `${(job.hellingerFidelity * 100).toFixed(1)}%` : "—"}</KV>
+            <KV label="Transpiled depth">{job.transpiled?.depth ?? "—"}</KV>
+            <KV label="Two-qubit gates">{job.transpiled?.twoQubitGates ?? "—"}</KV>
+            <KV label={job.target === "ibm" ? "Quantum time" : "Simulation time"}>{job.target === "ibm" ? (job.ibmUsage?.quantumSeconds != null ? `${job.ibmUsage.quantumSeconds} s` : "—") : job.executionSeconds != null ? `${job.executionSeconds} s` : "—"}</KV>
+            {job.transpiled?.physicalQubits && <div className="sm:col-span-4"><KV label="Physical qubits used"><span className="font-mono text-[12px] text-slate-300">{job.transpiled.physicalQubits.join(", ")}</span></KV></div>}
+          </dl>
           {job.analysis?.outcomes && (
             <div className="overflow-x-auto">
-              <div className="label mb-2">Classical post-processing (continued fractions → period → gcd)</div>
-              <table className="w-full text-xs">
-                <thead><tr className="text-left text-slate-400"><th className="py-1.5 pr-3">Outcome</th><th className="py-1.5 pr-3">Shots</th><th className="py-1.5 pr-3">Phase</th><th className="py-1.5 pr-3">Period r</th><th className="py-1.5">Result</th></tr></thead>
-                <tbody className="divide-y divide-white/[0.05] font-mono">
+              <div className="label mb-2">Classical post-processing: continued fractions, then period, then gcd</div>
+              <table className="w-full text-[12px]">
+                <thead className="border-b border-ink-700"><tr className="text-left text-slate-500"><th className="py-1.5 pr-4 font-medium">Outcome</th><th className="py-1.5 pr-4 font-medium">Shots</th><th className="py-1.5 pr-4 font-medium">Phase</th><th className="py-1.5 pr-4 font-medium">Period r</th><th className="py-1.5 font-medium">Result</th></tr></thead>
+                <tbody className="divide-y divide-ink-800 font-mono">
                   {job.analysis.outcomes.slice(0, 8).map((o) => (
-                    <tr key={o.bitstring}><td className="py-1.5 pr-3 text-white">{o.bitstring}</td><td className="py-1.5 pr-3 text-slate-300">{o.count}</td><td className="py-1.5 pr-3 text-slate-300">{o.phase}</td><td className="py-1.5 pr-3 text-slate-300">{o.periodCandidate}{o.periodValid ? " ✓" : ""}</td><td className={cx("py-1.5", o.factors ? "text-emerald-300" : "text-slate-500")}>{o.factors ? `15 = ${o.factors[0]} × ${o.factors[1]}` : "no factor (retry)"}</td></tr>
+                    <tr key={o.bitstring}><td className="py-1.5 pr-4 text-white">{o.bitstring}</td><td className="py-1.5 pr-4 text-slate-300">{o.count}</td><td className="py-1.5 pr-4 text-slate-300">{o.phase}</td><td className="py-1.5 pr-4 text-slate-300">{o.periodCandidate}{o.periodValid ? " ✓" : ""}</td><td className={cx("py-1.5", o.factors ? "text-emerald-300" : "text-slate-500")}>{o.factors ? `15 = ${o.factors[0]} × ${o.factors[1]}` : "no factor"}</td></tr>
                   ))}
                 </tbody>
               </table>
-            </div>
-          )}
-          {job.transpiled && (
-            <div className="grid gap-3 rounded-xl border border-white/[0.06] bg-ink-900/40 p-4 sm:grid-cols-4">
-              <KV label="Transpiled depth">{job.transpiled.depth}</KV>
-              <KV label="Two-qubit gates">{job.transpiled.twoQubitGates}</KV>
-              <KV label="Physical qubits"><span className="font-mono text-xs">{job.transpiled.physicalQubits?.join(", ") ?? "—"}</span></KV>
-              <KV label={job.target === "ibm" ? "QPU time" : "Sim time"}>{job.target === "ibm" ? (job.ibmUsage?.quantumSeconds != null ? `${job.ibmUsage.quantumSeconds}s` : "—") : job.executionSeconds != null ? `${job.executionSeconds}s` : "—"}</KV>
             </div>
           )}
         </>

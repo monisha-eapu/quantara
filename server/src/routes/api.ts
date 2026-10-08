@@ -32,7 +32,7 @@ api.get("/dashboard", h(() => dashboard()));
 
 // ---- Records ---------------------------------------------------------------
 api.get("/records", h((req) => listRecords({
-  type: str(req.query.type), status: str(req.query.status), q: str(req.query.q),
+  type: str(req.query.type), status: str(req.query.status), propertyType: str(req.query.propertyType), year: str(req.query.year), q: str(req.query.q),
   limit: num(req.query.limit), offset: num(req.query.offset), featuredFirst: req.query.featuredFirst === "true",
 })));
 api.get("/records/meta", h(() => ({ propertyTypes: PROPERTY_TYPES, statuses: LAND_STATUSES, demoRecordId: DEMO_RECORD_ID,
@@ -43,7 +43,7 @@ api.post("/records", h((req, res) => {
   return result;
 }));
 api.get("/records/:id", h((req) => getRecordDetail(param(req, "id"))));
-api.post("/records/:id/verify", h((req) => verifyRecord(param(req, "id"), "Verifier")));
+api.post("/records/:id/verify", h((req) => verifyRecord(param(req, "id"), "Verifier", undefined, { passive: req.query.passive === "1" })));
 const tamperSchema = z.object({ field: z.string().min(1), value: z.string().trim().min(1).max(200), mode: z.enum(["FIELD_ONLY", "FIELD_AND_HASH"]).default("FIELD_ONLY") });
 api.post("/records/:id/tamper", h((req) => tamperRecord(param(req, "id"), tamperSchema.parse(req.body))));
 api.post("/records/:id/restore", h((req) => restoreRecord(param(req, "id"))));
@@ -90,7 +90,7 @@ api.post("/supply-chain/products/:id/events", h((req, res) => {
   res.status(201);
   return out;
 }));
-api.post("/supply-chain/products/:id/verify", h((req) => verifyProduct(param(req, "id"))));
+api.post("/supply-chain/products/:id/verify", h((req) => verifyProduct(param(req, "id"), "Verifier", { passive: req.query.passive === "1" })));
 const eventTamperSchema = z.object({ field: z.string().min(1), value: z.string().trim().min(1).max(200) });
 api.post("/supply-chain/events/:id/tamper", h((req) => tamperEvent(param(req, "id"), eventTamperSchema.parse(req.body))));
 api.post("/supply-chain/events/:id/restore", h((req) => restoreEvent(param(req, "id"))));

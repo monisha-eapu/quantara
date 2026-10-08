@@ -1,45 +1,41 @@
-import { Activity, Atom, BookLock, Boxes, FileCheck2, LayoutDashboard, Link2, Map, Menu, Repeat2, Settings, ShieldCheck, X } from "lucide-react";
+import { motion } from "framer-motion";
+import { Atom, FileCheck2, Landmark, LayoutGrid, Link2, Menu, Package, Repeat2, ScrollText, Settings, ShieldCheck, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router";
-import { api } from "../lib/api";
-import { cx } from "./ui";
+import { useSystemStatus } from "../lib/useSystemStatus";
+import { cx, Dot } from "./ui";
 
-const NAV: { section: string; items: { to: string; label: string; icon: ReactNode; tone?: "quantum" }[] }[] = [
-  { section: "Overview", items: [{ to: "/", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> }] },
+interface NavItem { to: string; label: string; icon: ReactNode; indent?: boolean }
+const icon = "h-[15px] w-[15px]";
+
+const NAV: { heading?: string; items: NavItem[] }[] = [
+  { items: [{ to: "/", label: "Overview", icon: <LayoutGrid className={icon} /> }] },
   {
-    section: "Registries",
+    heading: "Registry",
     items: [
-      { to: "/land", label: "Land Registry", icon: <Map className="h-4 w-4" /> },
-      { to: "/supply-chain", label: "Supply Chain", icon: <Boxes className="h-4 w-4" /> },
+      { to: "/land", label: "Land Records", icon: <Landmark className={icon} /> },
+      { to: "/supply-chain", label: "Supply Chain", icon: <Package className={icon} /> },
     ],
   },
   {
-    section: "Trust",
     items: [
-      { to: "/verify", label: "Verify Record", icon: <FileCheck2 className="h-4 w-4" /> },
-      { to: "/ledger", label: "Ledger Explorer", icon: <Link2 className="h-4 w-4" /> },
-      { to: "/audit", label: "Audit Trail", icon: <BookLock className="h-4 w-4" /> },
+      { to: "/verify", label: "Verification", icon: <FileCheck2 className={icon} /> },
+      { to: "/ledger", label: "Ledger", icon: <Link2 className={icon} /> },
+      { to: "/migration", label: "Post-Quantum", icon: <Repeat2 className={icon} /> },
+      { to: "/quantum", label: "Quantum Lab", icon: <Atom className={icon} /> },
+      { to: "/audit", label: "Audit Trail", icon: <ScrollText className={icon} /> },
+      { to: "/settings", label: "Settings", icon: <Settings className={icon} /> },
     ],
   },
-  {
-    section: "Post-Quantum",
-    items: [
-      { to: "/migration", label: "PQC Migration", icon: <Repeat2 className="h-4 w-4" /> },
-      { to: "/quantum", label: "Quantum Threat Lab", icon: <Atom className="h-4 w-4" />, tone: "quantum" },
-    ],
-  },
-  { section: "System", items: [{ to: "/settings", label: "Cryptography", icon: <Settings className="h-4 w-4" /> }] },
 ];
 
 function Brand() {
   return (
-    <div className="flex items-center gap-3 px-2">
-      <div className="relative grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-sky-400 to-brand-600 shadow-[0_0_24px_-4px_rgba(47,123,255,0.9)]">
-        <ShieldCheck className="h-5 w-5 text-white" />
-      </div>
-      <div>
-        <div className="text-[15px] font-bold tracking-tight text-white">QuantumShield</div>
-        <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-slate-400">Post-Quantum Trust</div>
+    <div className="flex items-center gap-2.5 px-3">
+      <div className="grid h-7 w-7 place-items-center rounded-md bg-brand-500"><ShieldCheck className="h-4 w-4 text-white" strokeWidth={2.25} /></div>
+      <div className="leading-tight">
+        <div className="text-[13px] font-bold tracking-[0.04em] text-white">QUANTUMSHIELD</div>
+        <div className="text-[10px] font-medium tracking-[0.1em] text-slate-500">TRUST INFRASTRUCTURE</div>
       </div>
     </div>
   );
@@ -47,57 +43,64 @@ function Brand() {
 
 function Nav({ onNavigate }: { onNavigate?: () => void }) {
   return (
-    <nav className="mt-8 space-y-6">
-      {NAV.map((group) => (
-        <div key={group.section}>
-          <div className="label mb-2 px-3 text-[10px] text-slate-500">{group.section}</div>
-          <div className="space-y-0.5">
+    <nav className="mt-7 flex-1 space-y-5 overflow-y-auto px-2" aria-label="Primary">
+      {NAV.map((group, i) => (
+        <div key={i}>
+          {group.heading && <div className="mb-1 px-3 text-[11px] font-medium text-slate-500">{group.heading}</div>}
+          <ul className="space-y-0.5">
             {group.items.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === "/"}
-                onClick={onNavigate}
-                className={({ isActive }) =>
-                  cx(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition",
-                    isActive
-                      ? item.tone === "quantum"
-                        ? "bg-quantum-500/15 text-quantum-400 ring-1 ring-quantum-500/30"
-                        : "bg-brand-500/15 text-white ring-1 ring-brand-500/30"
-                      : "text-slate-400 hover:bg-white/[0.04] hover:text-slate-100",
-                  )
-                }
-              >
-                {item.icon}
-                {item.label}
-              </NavLink>
+              <li key={item.to}>
+                <NavLink
+                  to={item.to}
+                  end={item.to === "/"}
+                  onClick={onNavigate}
+                  className={({ isActive }) =>
+                    cx(
+                      "flex items-center gap-2.5 rounded-md px-3 py-[7px] text-[13.5px] font-medium transition-colors",
+                      isActive ? "bg-brand-500/[0.14] text-white" : "text-slate-400 hover:bg-ink-800 hover:text-slate-100",
+                    )
+                  }
+                >
+                  {({ isActive }) => (<><span className={isActive ? "text-brand-400" : "text-slate-500"}>{item.icon}</span>{item.label}</>)}
+                </NavLink>
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
       ))}
     </nav>
   );
 }
 
-function HealthChip() {
-  const [state, setState] = useState<{ ok: boolean; openssl?: string } | null>(null);
-  useEffect(() => {
-    let alive = true;
-    const check = () => api.get<{ ok: boolean; openssl: string }>("/health").then((h) => alive && setState(h)).catch(() => alive && setState({ ok: false }));
-    check();
-    const t = setInterval(check, 15000);
-    return () => { alive = false; clearInterval(t); };
-  }, []);
-  if (!state) return null;
+function SidebarStatus() {
+  const s = useSystemStatus();
+  const ok = s.apiOnline && s.cryptoOnline && s.ledgerValid;
   return (
-    <div className={cx("flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium", state.ok ? "border-emerald-500/25 bg-emerald-500/[0.07] text-emerald-300" : "border-red-500/30 bg-red-500/10 text-red-300")}>
-      <span className="relative flex h-2 w-2">
-        {state.ok && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />}
-        <span className={cx("relative inline-flex h-2 w-2 rounded-full", state.ok ? "bg-emerald-400" : "bg-red-400")} />
-      </span>
-      {state.ok ? "ML-DSA-65 engine online" : "API offline"}
+    <div className="border-t border-ink-700 px-5 py-4">
+      <div className="text-[10px] font-medium tracking-[0.1em] text-slate-500">SYSTEM STATUS</div>
+      <div className={cx("mt-1.5 flex items-center gap-2 text-[13px] font-medium", !s.loaded ? "text-slate-400" : ok ? "text-slate-200" : "text-red-300")}>
+        <Dot tone={!s.loaded ? "slate" : ok ? "green" : "red"} />
+        {!s.loaded ? "Checking…" : !s.apiOnline ? "API unreachable" : !s.ledgerValid ? "Ledger integrity failure" : !s.cryptoOnline ? "Cryptographic engine offline" : "All systems operational"}
+      </div>
+      <div className="mt-2 text-[11px] leading-snug text-slate-500">Prototype · all records are fictional demo data</div>
     </div>
+  );
+}
+
+function TopBar({ onMenu }: { onMenu: () => void }) {
+  const s = useSystemStatus();
+  const secure = s.apiOnline && s.cryptoOnline && s.ledgerValid;
+  return (
+    <header className="sticky top-0 z-20 flex h-12 items-center justify-between border-b border-ink-700 bg-ink-950/95 px-4 backdrop-blur-sm md:px-8">
+      <div className="flex items-center gap-3">
+        <button className="rounded-md p-1.5 text-slate-300 hover:bg-ink-800 lg:hidden" onClick={onMenu} aria-label="Open navigation"><Menu className="h-5 w-5" /></button>
+        <span className="hidden text-[12px] font-medium text-slate-400 sm:inline">Post-quantum trust for critical digital records</span>
+      </div>
+      <div className={cx("flex items-center gap-2 whitespace-nowrap text-[12px] font-semibold tracking-[0.06em]", !s.loaded ? "text-slate-500" : secure ? "text-emerald-300" : "text-red-300")}>
+        {!s.loaded ? "CHECKING" : secure ? "SYSTEM SECURE" : "ATTENTION REQUIRED"}
+        <Dot tone={!s.loaded ? "slate" : secure ? "green" : "red"} />
+      </div>
+    </header>
   );
 }
 
@@ -106,36 +109,33 @@ export function Layout({ children }: { children: ReactNode }) {
   const location = useLocation();
   useEffect(() => { window.scrollTo(0, 0); }, [location.pathname]);
   return (
-    <div className="min-h-screen lg:pl-64">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-white/[0.06] bg-ink-900/80 px-3 py-5 backdrop-blur-xl lg:flex">
+    <div className="min-h-screen lg:pl-60">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-ink-700 bg-ink-900 pt-5 lg:flex">
         <Brand />
         <Nav />
-        <div className="mt-auto rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 text-[11px] leading-relaxed text-slate-400">
-          <div className="mb-1 flex items-center gap-1.5 font-semibold text-slate-300"><Activity className="h-3.5 w-3.5 text-brand-400" /> Hackathon prototype</div>
-          All records are fictional demo data. Not for production use.
-        </div>
+        <SidebarStatus />
       </aside>
 
       {open && (
         <div className="fixed inset-0 z-40 bg-black/60 lg:hidden" onClick={() => setOpen(false)}>
-          <aside className="h-full w-72 overflow-y-auto bg-ink-900 px-3 py-5" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between"><Brand /><button onClick={() => setOpen(false)} className="p-2 text-slate-400"><X className="h-5 w-5" /></button></div>
+          <aside className="flex h-full w-72 flex-col bg-ink-900 pt-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between pr-3"><Brand /><button onClick={() => setOpen(false)} className="p-2 text-slate-400" aria-label="Close navigation"><X className="h-5 w-5" /></button></div>
             <Nav onNavigate={() => setOpen(false)} />
+            <SidebarStatus />
           </aside>
         </div>
       )}
 
-      <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-3 border-b border-white/[0.06] bg-ink-950/70 px-4 backdrop-blur-xl md:px-8">
-        <div className="flex items-center gap-3">
-          <button className="rounded-md p-1.5 text-slate-300 hover:bg-white/10 lg:hidden" onClick={() => setOpen(true)} aria-label="Open navigation"><Menu className="h-5 w-5" /></button>
-          <span className="hidden text-sm text-slate-400 sm:block">Post-Quantum Trust for Critical Digital Records</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="hidden rounded-full border border-brand-500/30 bg-brand-500/10 px-3 py-1 text-xs font-semibold text-brand-300 md:inline">FIPS 204 · ML-DSA-65</span>
-          <HealthChip />
-        </div>
-      </header>
-      <main className="mx-auto max-w-[1400px] px-4 py-6 md:px-8 md:py-8">{children}</main>
+      <TopBar onMenu={() => setOpen(true)} />
+      <motion.main
+        key={location.pathname}
+        initial={{ opacity: 0, y: 4 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.16, ease: "easeOut" }}
+        className="mx-auto max-w-[1280px] px-4 py-7 md:px-8 md:py-9"
+      >
+        {children}
+      </motion.main>
     </div>
   );
 }

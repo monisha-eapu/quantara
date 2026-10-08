@@ -1,7 +1,7 @@
 import { ArrowRight, Blocks, CheckCircle2, FileJson, Fingerprint, KeyRound, Plus } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
-import { Button, Card, cx, ErrorState, Field, Hash, InlineError, KV, Loading, PageHeader, Pill } from "../components/ui";
+import { Button, Section, cx, ErrorState, Field, Hash, InlineError, KV, Loading, PageHeader, Pill } from "../components/ui";
 import { api, type RecordSummary, type SigningTrace } from "../lib/api";
 import { useAction, useApi } from "../lib/hooks";
 
@@ -45,9 +45,9 @@ export default function CreateLandRecord() {
 
   return (
     <div>
-      <PageHeader eyebrow="Land Registry" title="Register a land record" description="On submission the server canonicalises the record, computes its SHA-256 fingerprint, signs it with the authority's ML-DSA-65 private key (which never leaves the server) and appends a ledger block linked to the previous block." />
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <Card title="Record details" subtitle="Fictional data only">
+      <PageHeader title="Create land record" description="On submission the server canonicalises the record, computes its SHA-256 fingerprint, signs it with the authority's ML-DSA-65 private key (which never leaves the server) and appends a ledger block linked to the previous block." />
+      <div className="grid gap-x-12 gap-y-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <Section title="Record details" description="Fictional data only">
           <form className="grid gap-4 sm:grid-cols-2" onSubmit={(e) => { e.preventDefault(); create.run(); }}>
             <Field label="Property ID" hint="Format: STATE-DISTRICT-NUMBER"><input className="input font-mono" value={form.propertyId} onChange={set("propertyId")} required /></Field>
             <Field label="Owner name"><input className="input" value={form.ownerName} onChange={set("ownerName")} placeholder="e.g. Kavitha Reddy" required minLength={2} /></Field>
@@ -76,12 +76,12 @@ export default function CreateLandRecord() {
             </div>
             <div className="sm:col-span-2"><InlineError error={create.error} /></div>
             <div className="flex justify-end sm:col-span-2">
-              <Button type="submit" variant="primary" size="lg" loading={create.pending} icon={<Plus className="h-4 w-4" />}>Sign &amp; anchor record</Button>
+              <Button type="submit" variant="primary" size="lg" loading={create.pending} icon={<Plus className="h-4 w-4" />}>Sign and anchor record</Button>
             </div>
           </form>
-        </Card>
+        </Section>
 
-        <Card title="Security pipeline" subtitle={result ? `Completed for ${result.record.id}` : "Runs on submit"}>
+        <Section title="Security pipeline" description={result ? `Completed for ${result.record.id}` : "Runs on submit"}>
           {!result ? (
             <ol className="space-y-3">
               {[
@@ -90,8 +90,8 @@ export default function CreateLandRecord() {
                 [<KeyRound className="h-4 w-4" />, "ML-DSA-65 digital signature", "Post-quantum signature (FIPS 204) by the issuing authority."],
                 [<Blocks className="h-4 w-4" />, "Ledger block", "Appended to the chain; its hash commits to the previous block."],
               ].map(([icon, t, d], i) => (
-                <li key={i} className="flex gap-3 rounded-xl border border-white/[0.06] bg-ink-900/40 p-3.5">
-                  <div className={cx("grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-brand-500/10 text-brand-400", create.pending && "scanline")}>{icon}</div>
+                <li key={i} className="flex gap-3 rounded-lg border border-ink-700 p-3.5">
+                  <div className={cx("grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-ink-800 text-slate-300", create.pending && "scanline")}>{icon}</div>
                   <div><div className="text-sm font-medium text-slate-100">{i + 1}. {t}</div><div className="text-xs text-slate-400">{d}</div></div>
                 </li>
               ))}
@@ -104,7 +104,7 @@ export default function CreateLandRecord() {
               <Step n={2} title="SHA-256 hash" meta={`${result.trace.timingsMs.hash} ms`}><Hash value={result.trace.dataHash} full /></Step>
               <Step n={3} title={`${result.trace.algorithm} signature`} meta={`${result.trace.signatureBytes.toLocaleString()} bytes · ${result.trace.timingsMs.sign} ms`}>
                 <div className="text-xs text-slate-400">Signed by {result.trace.signer.name} · {result.trace.signer.organization}</div>
-                <code className="mt-1 block break-all font-mono text-[10.5px] text-cyan-200/80">{result.trace.signaturePreview}…</code>
+                <code className="mt-1 block break-all font-mono text-[10.5px] text-slate-300">{result.trace.signaturePreview}…</code>
               </Step>
               <Step n={4} title={`Ledger block #${result.trace.block.index}`} meta={`${result.trace.timingsMs.ledger} ms`}>
                 <div className="grid gap-2 sm:grid-cols-2">
@@ -121,7 +121,7 @@ export default function CreateLandRecord() {
               </div>
             </div>
           )}
-        </Card>
+        </Section>
       </div>
     </div>
   );
@@ -129,7 +129,7 @@ export default function CreateLandRecord() {
 
 function Step({ n, title, meta, children }: { n: number; title: string; meta: string; children: React.ReactNode }) {
   return (
-    <div className="fade-up rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] p-3.5" style={{ animationDelay: `${n * 90}ms` }}>
+    <div className="fade-up rounded-lg border border-ink-700 p-3.5" style={{ animationDelay: `${n * 90}ms` }}>
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-sm font-semibold text-slate-100"><CheckCircle2 className="h-4 w-4 text-emerald-400" /> {n}. {title}</div>
         <span className="text-[11px] text-slate-500">{meta}</span>

@@ -1,8 +1,8 @@
-import { Boxes, MapPin, Plus, Truck } from "lucide-react";
+import { Package, Plus } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { STAGE_META, STAGES } from "../components/stages";
-import { Button, Card, cx, Empty, ErrorState, Field, InlineError, Loading, Modal, PageHeader, Pill, StatusBadge } from "../components/ui";
+import { Button, cx, Empty, ErrorState, Field, InlineError, Loading, Modal, PageHeader, Pill, StatusBadge } from "../components/ui";
 import { api, type RecordSummary } from "../lib/api";
 import { timeAgo } from "../lib/format";
 import { useAction, useApi } from "../lib/hooks";
@@ -22,54 +22,38 @@ export default function SupplyChain() {
   return (
     <div>
       <PageHeader
-        eyebrow="Supply chain provenance"
-        title="Product provenance"
-        description="Every custody transfer is a signed event. Each event's hash commits to the previous event's hash, and each is signed with ML-DSA-65 by the accountable party, giving a tamper-evident chain from manufacture to retail."
-        actions={<Button variant="primary" onClick={() => setOpen(true)} icon={<Plus className="h-4 w-4" />}>Register product batch</Button>}
+        title="Supply Chain"
+        description="Track product provenance from manufacture to retail. Every custody transfer is a signed event linked to the one before it."
+        actions={<Button variant="primary" onClick={() => setOpen(true)} icon={<Plus className="h-4 w-4" />}>Register batch</Button>}
       />
       {loading && !data ? <Loading /> : error ? <ErrorState error={error} onRetry={reload} /> : !data?.products.length ? (
-        <Card><Empty icon={<Boxes className="h-8 w-8" />} title="No products yet" description="Register a product batch to start a provenance chain." /></Card>
+        <div className="rounded-lg border border-ink-700"><Empty icon={<Package className="h-7 w-7" />} title="No product batches yet" description="Register a batch to start a provenance chain." /></div>
       ) : (
-        <div className="grid gap-5 lg:grid-cols-2">
-          {data.products.map((p) => {
-            const tampered = p.integrityStatus === "TAMPERED" || p.eventIntegrity === "TAMPERED";
-            const reached = new Set(p.stages);
-            return (
-              <button key={p.id} onClick={() => navigate(`/supply-chain/${p.id}`)} className={cx("glass group rounded-2xl p-5 text-left transition hover:-translate-y-0.5 hover:border-brand-500/40", tampered && "ring-1 ring-red-500/40")}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="font-mono text-xs font-semibold text-brand-300">{p.id}</div>
-                    <div className="mt-1 truncate text-lg font-semibold text-white">{String(p.data.productName)}</div>
-                    <div className="text-xs text-slate-400">{String(p.data.manufacturer)} · {String(p.data.origin)}</div>
-                  </div>
-                  <StatusBadge status={tampered ? "TAMPERED" : p.integrityStatus} />
-                </div>
-                <div className="mt-5 flex items-center">
-                  {STAGES.map((s, i) => (
-                    <div key={s} className="flex flex-1 items-center last:flex-none">
-                      <div title={STAGE_META[s].label} className={cx("grid h-8 w-8 place-items-center rounded-full border transition", reached.has(s) ? "border-brand-400/60 bg-brand-500/20 text-brand-300 shadow-[0_0_14px_-2px_rgba(47,123,255,0.8)]" : "border-white/10 bg-white/[0.02] text-slate-600")}>
-                        {STAGE_META[s].icon}
+        <div className="overflow-x-auto rounded-lg border border-ink-700">
+          <table className="w-full min-w-[860px] text-[13px]">
+            <thead className="border-b border-ink-700 bg-ink-900"><tr><th className="th">Batch</th><th className="th">Product</th><th className="th">Progress</th><th className="th">Current custodian</th><th className="th">Updated</th><th className="th">Integrity</th></tr></thead>
+            <tbody className="divide-y divide-ink-800">
+              {data.products.map((p) => {
+                const tampered = p.integrityStatus === "TAMPERED" || p.eventIntegrity === "TAMPERED";
+                const reached = new Set(p.stages);
+                return (
+                  <tr key={p.id} className="cursor-pointer hover:bg-ink-900" onClick={() => navigate(`/supply-chain/${p.id}`)} tabIndex={0} onKeyDown={(e) => e.key === "Enter" && navigate(`/supply-chain/${p.id}`)}>
+                    <td className="td font-mono text-[12px] font-medium text-white">{p.id}</td>
+                    <td className="td"><div className="font-medium text-slate-100">{String(p.data.productName)}</div><div className="text-[11px] text-slate-500">{String(p.data.manufacturer)} · {String(p.data.origin)}</div></td>
+                    <td className="td">
+                      <div className="flex items-center gap-1" title={`${p.stages.length} of ${STAGES.length} stages recorded`}>
+                        {STAGES.map((s) => <span key={s} title={STAGE_META[s].label} className={cx("h-1.5 w-6 rounded-sm", reached.has(s) ? "bg-brand-500" : "bg-ink-700")} />)}
                       </div>
-                      {i < STAGES.length - 1 && <div className={cx("mx-1 h-px flex-1", reached.has(STAGES[i + 1]) ? "bg-brand-400/60" : "bg-white/10")} />}
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400">
-                  {p.currentState && (
-                    <>
-                      <span className="flex items-center gap-1"><Truck className="h-3.5 w-3.5" /> {p.currentState.status}</span>
-                      <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {p.currentState.location}</span>
-                      <span>Custodian: <span className="text-slate-200">{p.currentState.custodian}</span></span>
-                    </>
-                  )}
-                </div>
-                <div className="mt-3 flex items-center justify-between border-t border-white/[0.06] pt-3 text-xs text-slate-500">
-                  <span>{p.eventCount} signed events · {String(p.data.certification)}</span>
-                  <span>{p.currentState ? `updated ${timeAgo(p.currentState.updatedAt)}` : ""}</span>
-                </div>
-              </button>
-            );
-          })}
+                      <div className="mt-1 text-[11px] text-slate-500">{p.currentState?.status ?? "—"}</div>
+                    </td>
+                    <td className="td text-slate-300">{p.currentState?.custodian ?? "—"}<div className="text-[11px] text-slate-500">{p.currentState?.location}</div></td>
+                    <td className="td whitespace-nowrap text-slate-400">{p.currentState ? timeAgo(p.currentState.updatedAt) : "—"}</td>
+                    <td className="td"><StatusBadge status={tampered ? "TAMPERED" : p.integrityStatus} /></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
       {open && <CreateProductModal onClose={() => setOpen(false)} onCreated={(id) => navigate(`/supply-chain/${id}`)} />}
@@ -100,11 +84,11 @@ function CreateProductModal({ onClose, onCreated }: { onClose: () => void; onCre
         <Field label="Origin"><input className="input" value={form.origin} onChange={set("origin")} required /></Field>
         <Field label="Certification"><input className="input" value={form.certification} onChange={set("certification")} required /></Field>
         <Field label="Manufacturing location"><input className="input" value={form.initialLocation} onChange={set("initialLocation")} required /></Field>
-        <div className="sm:col-span-2 text-xs text-slate-400">Creates a signed product record plus a signed <Pill tone="blue">MANUFACTURED</Pill> event, each anchored in its own ledger block.</div>
+        <div className="text-xs text-slate-400 sm:col-span-2">Creates a signed product record and a signed <Pill tone="blue">MANUFACTURED</Pill> event, each anchored in its own ledger block.</div>
         <div className="sm:col-span-2"><InlineError error={create.error} /></div>
         <div className="flex justify-end gap-2 sm:col-span-2">
           <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="primary" loading={create.pending}>Sign &amp; register</Button>
+          <Button type="submit" variant="primary" loading={create.pending}>Sign and register</Button>
         </div>
       </form>
     </Modal>

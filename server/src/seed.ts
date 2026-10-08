@@ -190,7 +190,7 @@ export function seedDemoData(log: (msg: string) => void = console.log): void {
   }
 
   // Featured records are the newest so they lead the dashboard; the demo record is the most recent.
-  [...FEATURED].reverse().forEach((r, i) => {
+  FEATURED.forEach((r, i) => {
     const at = now - (2 * HOUR + i * 13 * HOUR);
     ops.push({ at, run: () => createLandRecord(r, { featured: true, timestamp: iso(at) }) });
   });

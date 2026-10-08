@@ -139,7 +139,7 @@ Single-node permissioned append-only ledger. There is no mining, proof-of-work o
 
 Requirements:
 - **Node.js ≥ 24**. Must be built with OpenSSL ≥ 3.5 for native ML-DSA; official Node 24 builds are. The server refuses to start otherwise; it never silently falls back.
-- **Python 3.9+** for the quantum service. 3.10+ is recommended because Qiskit is dropping 3.9.
+- **Python 3.10+** for the quantum service (`npm run setup` finds one, or installs 3.12 via `uv`). The macOS system Python 3.9 cannot reach IBM Quantum (old LibreSSL).
 
 ```bash
 npm run setup      # npm install + Python venv + pip install -r quantum-service/requirements.txt + creates .env
@@ -218,7 +218,7 @@ There are three execution targets: a local ideal simulator (Aer), a local noisy 
 - The tamper and restore endpoints exist purely for demonstration and must not exist in production.
 - The ML-DSA implementation is OpenSSL's; it has not been reviewed further here. The app as a whole has had no security review.
 - IBM hardware execution was verified end-to-end against Qiskit Runtime's local test channel. A real hardware run needs your IBM Quantum token and consumes your allocation.
-- Python 3.9 works but is deprecated by Qiskit; use 3.10+.
+- Python 3.9 cannot connect to IBM Quantum (old LibreSSL TLS); use 3.10+.
 
 ## 16. Future production architecture
 

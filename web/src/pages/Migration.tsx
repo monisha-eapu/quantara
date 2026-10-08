@@ -1,77 +1,67 @@
-import { ArrowRight, ArrowDown, CheckCircle2, Clock, Gauge, KeyRound, Layers, Repeat2, ShieldAlert, ShieldCheck } from "lucide-react";
+import { ArrowRight, Gauge, Repeat2 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 import { CheckList, VerdictBanner } from "../components/Verification";
-import { Button, Card, cx, Empty, ErrorState, InlineError, Loading, PageHeader, Pill, StatusBadge } from "../components/ui";
+import { Button, cx, Empty, ErrorState, InlineError, Loading, PageHeader, Pill, Section, StatusBadge } from "../components/ui";
 import { api, type EntityVerification, type RecordSummary } from "../lib/api";
 import { useAction, useApi } from "../lib/hooks";
 
 interface Overview { candidates: RecordSummary[]; migrated: (RecordSummary & { legacyAlgorithm: string })[]; counts: { pqcRecords: number; legacyRecords: number; hybridRecords: number } }
-interface SchemeResult { algorithm: string; displayName: string; family: string; standard: string; securityNote: string; signer: string; publicKeyBytes: number; signatureBytes: number; signaturePreview: string; verified: boolean; signMs: number; verifyMs: number; keygenMs: number }
-interface Comparison { recordId: string; message: string; iterations: number; legacy: SchemeResult; pqc: SchemeResult }
+interface SchemeResult { algorithm: string; displayName: string; family: string; standard: string; publicKeyBytes: number; signatureBytes: number; signaturePreview: string; verified: boolean; signMs: number; verifyMs: number; keygenMs: number }
+interface Comparison { recordId: string; iterations: number; legacy: SchemeResult; pqc: SchemeResult }
+
+const FLOW = [
+  { n: "1", title: "Traditional cryptography", main: "RSA / ECC", body: "Widely deployed signatures. Secure against today's computers." },
+  { n: "2", title: "Potential future quantum threat", main: "Shor's algorithm", body: "A large fault-tolerant quantum computer could forge these signatures. No such machine exists today." },
+  { n: "3", title: "Post-quantum cryptography", main: "ML-DSA (FIPS 204)", body: "Lattice-based signatures designed to resist both classical and quantum attacks." },
+  { n: "4", title: "Quantum-ready migration", main: "Hybrid re-signing", body: "Verify the legacy signature, re-sign with ML-DSA, keep the old one as a co-signature, record it on the ledger." },
+];
 
 export default function Migration() {
   const overview = useApi(() => api.get<Overview>("/migration"));
+  const recent = useApi(() => api.get<{ records: RecordSummary[] }>("/records?type=LAND_RECORD&featuredFirst=true&limit=4"));
   const [selected, setSelected] = useState("");
   const [comparison, setComparison] = useState<Comparison | null>(null);
   const [migration, setMigration] = useState<{ before: EntityVerification; after: EntityVerification; signatureBytes: number } | null>(null);
-  const recent = useApi(() => api.get<{ records: RecordSummary[] }>("/records?type=LAND_RECORD&featuredFirst=true&limit=5"));
 
   const compare = useAction(async (id: string) => { setSelected(id); setMigration(null); setComparison(await api.post<Comparison>(`/migration/${id}/compare`)); });
   const migrate = useAction(async (id: string) => { setSelected(id); setMigration(await api.post(`/migration/${id}/migrate`)); await overview.reload(); });
+  const c = overview.data?.counts;
 
   return (
     <div>
-      <PageHeader eyebrow="Crypto-agility" title="Post-Quantum Migration" description="Long-lived records signed today with RSA or ECC must stay trustworthy for decades, beyond the point where a large fault-tolerant quantum computer might exist. QuantumShield shows a concrete migration path: verify the legacy signature, re-sign with ML-DSA, keep the classical signature as a co-signature, and anchor the change on the ledger." />
+      <PageHeader title="Post-Quantum Migration" description="Records signed today with RSA or ECC must stay trustworthy for decades. This shows how a legacy record moves to ML-DSA without losing its history." />
 
-      <div className="grid items-stretch gap-4 lg:grid-cols-[1fr_auto_1fr_auto_1fr]">
-        <div className="glass glow-amber rounded-2xl p-5">
-          <div className="label text-amber-300">Legacy</div>
-          <div className="mt-2 text-xl font-semibold text-white">RSA / ECC (ECDSA)</div>
-          <div className="mt-3 flex items-start gap-2 text-sm text-amber-200/90"><ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" /> Potentially vulnerable to future quantum attacks (Shor's algorithm)</div>
-          <div className="mt-3 text-xs text-slate-400">Small keys and signatures, very fast, widely deployed.</div>
-        </div>
-        <div className="hidden items-center justify-center text-slate-500 lg:flex"><ArrowRight className="h-6 w-6" /></div>
-        <div className="flex justify-center lg:hidden"><ArrowDown className="h-5 w-5 text-slate-500" /></div>
-        <div className="glass rounded-2xl p-5">
-          <div className="label text-brand-300">Migration</div>
-          <div className="mt-2 text-xl font-semibold text-white">Hybrid re-signing</div>
-          <ol className="mt-3 space-y-1.5 text-sm text-slate-300">
-            <li>1. Verify existing classical signature</li>
-            <li>2. Sign the same content hash with ML-DSA</li>
-            <li>3. Retain the classical co-signature</li>
-            <li>4. Anchor a MIGRATE block on the ledger</li>
-          </ol>
-        </div>
-        <div className="hidden items-center justify-center text-slate-500 lg:flex"><ArrowRight className="h-6 w-6" /></div>
-        <div className="flex justify-center lg:hidden"><ArrowDown className="h-5 w-5 text-slate-500" /></div>
-        <div className="glass glow-blue rounded-2xl p-5">
-          <div className="label text-brand-300">Post-quantum</div>
-          <div className="mt-2 text-xl font-semibold text-white">ML-DSA-65 (FIPS 204)</div>
-          <div className="mt-3 flex items-start gap-2 text-sm text-emerald-200/90"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" /> Designed for the post-quantum era</div>
-          <div className="mt-3 text-xs text-slate-400">Lattice-based. Larger keys and signatures; no known efficient quantum attack.</div>
-        </div>
-      </div>
+      <ol className="grid divide-y divide-ink-700 overflow-hidden rounded-xl border border-ink-700 bg-ink-900 lg:grid-cols-4 lg:divide-x lg:divide-y-0">
+        {FLOW.map((s, i) => (
+          <li key={s.n} className="relative px-5 py-5">
+            <div className="text-[11px] font-medium text-slate-500">{s.n}. {s.title}</div>
+            <div className={cx("mt-1.5 text-[19px] font-semibold tracking-[-0.01em]", i === 1 ? "text-amber-300" : i >= 2 ? "text-white" : "text-slate-200")}>{s.main}</div>
+            <p className="mt-1.5 text-[13px] leading-relaxed text-slate-400">{s.body}</p>
+            {i < FLOW.length - 1 && <ArrowRight className="absolute -right-2.5 top-1/2 z-10 hidden h-5 w-5 -translate-y-1/2 rounded-full bg-ink-900 p-0.5 text-slate-500 lg:block" aria-hidden />}
+          </li>
+        ))}
+      </ol>
 
-      {overview.data && (
-        <div className="mt-6 grid gap-4 sm:grid-cols-3">
-          {[["ML-DSA-protected entities", overview.data.counts.pqcRecords, "text-brand-300"], ["Legacy-signed records", overview.data.counts.legacyRecords, "text-amber-300"], ["Hybrid (migrated) records", overview.data.counts.hybridRecords, "text-emerald-300"]].map(([l, v, c]) => (
-            <div key={l as string} className="glass rounded-xl p-4"><div className="label">{l}</div><div className={cx("mt-1 text-2xl font-semibold tabular-nums", c as string)}>{(v as number).toLocaleString()}</div></div>
+      {c && (
+        <dl className="mt-8 grid grid-cols-3 divide-x divide-ink-700 border-y border-ink-700">
+          {[["Protected with ML-DSA", c.pqcRecords], ["Legacy-signed", c.legacyRecords], ["Migrated (hybrid)", c.hybridRecords]].map(([l, v]) => (
+            <div key={l as string} className="px-5 py-4"><dd className="text-[26px] font-bold tabular-nums tracking-[-0.02em] text-white">{(v as number).toLocaleString()}</dd><dt className="text-[13px] text-slate-400">{l}</dt></div>
           ))}
-        </div>
+        </dl>
       )}
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[400px_minmax(0,1fr)]">
-        <div className="space-y-6">
-          <Card title="Legacy-signed records" subtitle="Signed by the 2019 digitisation system with ECDSA P-256" icon={<KeyRound className="h-4 w-4 text-amber-400" />} bodyClass="p-0">
-            {overview.loading && !overview.data ? <Loading /> : overview.error ? <div className="p-4"><ErrorState error={overview.error} onRetry={overview.reload} /></div> : !overview.data?.candidates.length ? (
-              <Empty icon={<CheckCircle2 className="h-8 w-8 text-emerald-400" />} title="All records migrated" description="Every record is now protected by ML-DSA. Reset demo data in Cryptography settings to replay the migration." />
+      <div className="mt-12 grid gap-x-12 gap-y-10 xl:grid-cols-[400px_minmax(0,1fr)]">
+        <div className="space-y-10">
+          <Section title="Legacy-signed records" description="Signed by the 2019 digitisation system with ECDSA P-256.">
+            {overview.loading && !overview.data ? <Loading /> : overview.error ? <ErrorState error={overview.error} onRetry={overview.reload} /> : !overview.data?.candidates.length ? (
+              <Empty title="All records migrated" description="Every record is now protected by ML-DSA. Reset the demo data in Settings to replay the migration." />
             ) : (
-              <ul className="divide-y divide-white/[0.05]">
+              <ul className="divide-y divide-ink-800 border-y border-ink-800">
                 {overview.data.candidates.map((r) => (
-                  <li key={r.id} className={cx("px-5 py-3.5", selected === r.id && "bg-brand-500/[0.06]")}>
-                    <div className="flex items-center justify-between gap-2"><Link to={`/records/${r.id}`} className="font-mono text-xs font-semibold text-white hover:underline">{r.id}</Link><StatusBadge status={r.integrityStatus} /></div>
-                    <div className="mt-0.5 truncate text-xs text-slate-400">{r.title}</div>
+                  <li key={r.id} className={cx("px-1 py-3.5", selected === r.id && "bg-ink-900")}>
+                    <div className="flex items-center justify-between gap-2"><Link to={`/records/${r.id}`} className="font-mono text-[12px] font-medium text-white hover:underline">{r.id}</Link><StatusBadge status={r.integrityStatus} /></div>
+                    <div className="mt-0.5 truncate text-[13px] text-slate-400">{r.title}</div>
                     <div className="mt-2.5 flex gap-2">
                       <Button size="sm" onClick={() => compare.run(r.id)} loading={compare.pending && selected === r.id} icon={<Gauge className="h-3.5 w-3.5" />}>Compare</Button>
                       <Button size="sm" variant="primary" onClick={() => migrate.run(r.id)} loading={migrate.pending && selected === r.id} icon={<Repeat2 className="h-3.5 w-3.5" />}>Migrate to ML-DSA</Button>
@@ -80,80 +70,76 @@ export default function Migration() {
                 ))}
               </ul>
             )}
-          </Card>
-          <Card title="Compare on an ML-DSA record" bodyClass="p-0">
-            <ul className="divide-y divide-white/[0.05]">
+          </Section>
+          <Section title="Compare on an ML-DSA record">
+            <ul className="divide-y divide-ink-800 border-y border-ink-800">
               {recent.data?.records.map((r) => (
-                <li key={r.id} className="flex items-center justify-between gap-2 px-5 py-2.5">
-                  <span className="truncate font-mono text-xs text-slate-200">{r.id}</span>
+                <li key={r.id} className="flex items-center justify-between gap-2 px-1 py-2">
+                  <span className="truncate font-mono text-[12px] text-slate-300">{r.id}</span>
                   <Button size="sm" variant="ghost" onClick={() => compare.run(r.id)} loading={compare.pending && selected === r.id}>Compare</Button>
                 </li>
               ))}
             </ul>
-          </Card>
+          </Section>
           {overview.data && overview.data.migrated.length > 0 && (
-            <Card title="Migrated (hybrid)" bodyClass="p-0">
-              <ul className="divide-y divide-white/[0.05]">
+            <Section title="Migrated records">
+              <ul className="divide-y divide-ink-800 border-y border-ink-800">
                 {overview.data.migrated.map((r) => (
-                  <li key={r.id} className="flex items-center justify-between gap-2 px-5 py-2.5 text-xs">
+                  <li key={r.id} className="flex items-center justify-between gap-2 px-1 py-2 text-[12px]">
                     <Link to={`/records/${r.id}`} className="font-mono text-slate-200 hover:underline">{r.id}</Link>
-                    <span className="text-slate-400">{r.legacyAlgorithm} → <span className="text-brand-300">{r.algorithm}</span></span>
+                    <span className="text-slate-500">{r.legacyAlgorithm} → <span className="text-slate-200">{r.algorithm}</span></span>
                   </li>
                 ))}
               </ul>
-            </Card>
+            </Section>
           )}
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-10">
           <InlineError error={compare.error ?? migrate.error} />
           {migration ? (
-            <Card title={`Migration complete · ${migration.after.entityId}`} subtitle={`New ML-DSA-65 signature (${migration.signatureBytes.toLocaleString()} bytes) anchored in block #${migration.after.block?.index}`} icon={<Layers className="h-4 w-4" />}>
-              <div className="grid gap-4 lg:grid-cols-2">
-                <div><div className="label mb-2">Before</div><Pill tone="amber">{migration.before.algorithm}</Pill><div className="mt-3"><CheckList report={migration.before} compact /></div></div>
-                <div><div className="label mb-2">After</div><Pill tone="blue">{migration.after.algorithm} + legacy co-signature</Pill><div className="mt-3"><CheckList report={migration.after} compact /></div></div>
+            <Section title={`Migration complete: ${migration.after.entityId}`} description={`New ML-DSA-65 signature (${migration.signatureBytes.toLocaleString()} bytes) anchored in ledger block #${migration.after.block?.index}.`}>
+              <div className="grid gap-6 lg:grid-cols-2">
+                <div><div className="mb-2 flex items-center gap-2"><span className="label">Before</span><Pill tone="amber">{migration.before.algorithm}</Pill></div><CheckList report={migration.before} compact /></div>
+                <div><div className="mb-2 flex items-center gap-2"><span className="label">After</span><Pill tone="blue">{migration.after.algorithm} + legacy co-signature</Pill></div><CheckList report={migration.after} compact /></div>
               </div>
-              <div className="mt-4"><VerdictBanner report={migration.after} /></div>
-            </Card>
+              <div className="mt-5"><VerdictBanner report={migration.after} /></div>
+            </Section>
           ) : comparison ? (
-            <Card title={`Live signing comparison · ${comparison.recordId}`} subtitle={`Both algorithms sign the record's real signing message; timings averaged over ${comparison.iterations} runs on this server`} icon={<Gauge className="h-4 w-4" />}>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead><tr className="text-left"><th className="label py-2 pr-4" /><th className="label py-2 pr-4 text-amber-300">Legacy</th><th className="label py-2 text-brand-300">Post-quantum</th></tr></thead>
-                  <tbody className="divide-y divide-white/[0.05]">
+            <Section title={`Signing comparison: ${comparison.recordId}`} description={`Both algorithms sign this record's real signing message. Timings are averaged over ${comparison.iterations} runs on this server.`}>
+              <div className="overflow-x-auto rounded-lg border border-ink-700">
+                <table className="w-full text-[13px]">
+                  <thead className="border-b border-ink-700 bg-ink-900"><tr><th className="th" /><th className="th">Legacy</th><th className="th">Post-quantum</th></tr></thead>
+                  <tbody className="divide-y divide-ink-800">
                     {([
                       ["Algorithm", (s: SchemeResult) => <span className="font-semibold text-white">{s.displayName}</span>],
                       ["Standard", (s: SchemeResult) => <span className="text-xs text-slate-400">{s.standard}</span>],
-                      ["Quantum outlook", (s: SchemeResult) => s.family === "POST_QUANTUM" ? <span className="text-emerald-300">✓ Designed for the post-quantum era</span> : <span className="text-amber-300">⚠ Vulnerable to a large-scale quantum computer</span>],
+                      ["Quantum outlook", (s: SchemeResult) => s.family === "POST_QUANTUM" ? <span className="text-emerald-300">Designed for the post-quantum era</span> : <span className="text-amber-300">Vulnerable to a large-scale quantum computer</span>],
                       ["Public key size", (s: SchemeResult) => `${s.publicKeyBytes.toLocaleString()} bytes`],
                       ["Signature size", (s: SchemeResult) => `${s.signatureBytes.toLocaleString()} bytes`],
                       ["Sign time", (s: SchemeResult) => `${s.signMs} ms`],
                       ["Verify time", (s: SchemeResult) => `${s.verifyMs} ms`],
                       ["Key generation", (s: SchemeResult) => `${s.keygenMs} ms`],
-                      ["Signature verifies", (s: SchemeResult) => s.verified ? <span className="text-emerald-300">✓ Valid</span> : <span className="text-red-300">✗ Invalid</span>],
+                      ["Signature verifies", (s: SchemeResult) => s.verified ? <span className="text-emerald-300">Valid</span> : <span className="text-red-300">Invalid</span>],
                     ] as const).map(([label, render]) => (
-                      <tr key={label}><td className="py-2.5 pr-4 text-xs text-slate-400">{label}</td><td className="py-2.5 pr-4 text-slate-200">{render(comparison.legacy)}</td><td className="py-2.5 text-slate-200">{render(comparison.pqc)}</td></tr>
+                      <tr key={label}><td className="td text-slate-500">{label}</td><td className="td text-slate-200">{render(comparison.legacy)}</td><td className="td text-slate-200">{render(comparison.pqc)}</td></tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-lg bg-ink-950/60 p-3"><div className="label mb-1">ECDSA signature (base64)</div><code className="break-all font-mono text-[10.5px] text-amber-200/80">{comparison.legacy.signaturePreview}…</code></div>
-                <div className="rounded-lg bg-ink-950/60 p-3"><div className="label mb-1">ML-DSA-65 signature (first 88 of {Math.ceil(comparison.pqc.signatureBytes / 3) * 4} chars)</div><code className="break-all font-mono text-[10.5px] text-cyan-200/80">{comparison.pqc.signaturePreview}…</code></div>
-              </div>
-              <p className="mt-4 text-xs leading-relaxed text-slate-400">Trade-off: ML-DSA signatures are roughly {Math.round(comparison.pqc.signatureBytes / comparison.legacy.signatureBytes)}× larger than ECDSA, but signing and verification stay in the sub-millisecond range, which is negligible for registry workloads.</p>
-            </Card>
+              <p className="mt-4 text-[13px] leading-relaxed text-slate-400">ML-DSA signatures are about {Math.round(comparison.pqc.signatureBytes / comparison.legacy.signatureBytes)}× larger than ECDSA. Signing and verification stay well under a millisecond, which is negligible for registry workloads.</p>
+            </Section>
           ) : (
-            <Card bodyClass="p-0"><Empty icon={<Repeat2 className="h-9 w-9 text-brand-400" />} title="Select a record" description="Compare runs a live classical vs. ML-DSA signing benchmark on the record. Migrate performs a real, ledger-anchored hybrid re-signing of a legacy record." /></Card>
+            <Section title="Signing comparison"><Empty title="Select a record" description="Compare runs a live classical versus ML-DSA signing benchmark. Migrate performs a real, ledger-anchored hybrid re-signing of a legacy record." /></Section>
           )}
 
-          <Card title="Migration timeline context" icon={<Clock className="h-4 w-4" />}>
-            <ul className="space-y-3 text-sm">
-              <li className="flex gap-3"><Pill tone="blue">Aug 2024</Pill><span className="text-slate-300">NIST publishes FIPS 204 (ML-DSA), FIPS 203 (ML-KEM) and FIPS 205 (SLH-DSA).</span></li>
-              <li className="flex gap-3"><Pill tone="amber">2030 / 2035</Pill><span className="text-slate-300">NIST IR 8547 (initial public draft) proposes deprecating quantum-vulnerable RSA/ECC after 2030 and disallowing them after 2035.</span></li>
-              <li className="flex gap-3"><Pill tone="slate">Decades</Pill><span className="text-slate-300">Typical lifetime of land titles and regulated provenance records. Signatures must remain trustworthy for that whole period.</span></li>
-            </ul>
-          </Card>
+          <Section title="Why now">
+            <dl className="divide-y divide-ink-800 border-y border-ink-800 text-[13px]">
+              <div className="grid grid-cols-[110px_1fr] gap-4 py-3"><dt className="font-medium text-slate-200">Aug 2024</dt><dd className="text-slate-400">NIST published FIPS 203 (ML-KEM), FIPS 204 (ML-DSA) and FIPS 205 (SLH-DSA).</dd></div>
+              <div className="grid grid-cols-[110px_1fr] gap-4 py-3"><dt className="font-medium text-slate-200">2030 / 2035</dt><dd className="text-slate-400">NIST IR 8547 (initial public draft) proposes deprecating quantum-vulnerable RSA and ECC after 2030 and disallowing them after 2035.</dd></div>
+              <div className="grid grid-cols-[110px_1fr] gap-4 py-3"><dt className="font-medium text-slate-200">Decades</dt><dd className="text-slate-400">Typical lifetime of land titles and regulated provenance records. Signatures must stay trustworthy for that whole period.</dd></div>
+            </dl>
+          </Section>
         </div>
       </div>
     </div>
