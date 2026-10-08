@@ -1,100 +1,106 @@
-import { RefreshCcw } from "lucide-react";
-import { useState } from "react";
-import { Button, Section, ErrorState, Hash, InlineError, KV, Loading, Modal, PageHeader, Pill } from "../components/ui";
+import { useState, type ReactNode } from "react";
+import { useNavigate } from "react-router";
+import { Btn, ErrorState, Field, Hash, InlineError, Loading, Modal, PageTitle, rowCls, TableCard, theadCls } from "../components/ui";
 import { api } from "../lib/api";
-import { formatDateTime } from "../lib/format";
+import { formatDate, shortHash } from "../lib/format";
 import { useAction, useApi } from "../lib/hooks";
 
 interface CryptoInfo {
-  defaultAlgorithm: string;
   runtime: { node: string; openssl: string };
-  schemes: { id: string; displayName: string; family: string; standard: string; securityNote: string }[];
-  signers: { id: string; name: string; role: string; organization: string; algorithm: string; fingerprint: string; createdAt: string; publicKeyPem: string; publicKeyBytes: number }[];
-  hashing: { algorithm: string; canonicalization: string; signingMessage: string };
-  keyCustody: string;
+  signers: { id: string; name: string; role: string; organization: string; algorithm: string; fingerprint: string; createdAt: string; publicKeyPem: string }[];
+  hashing: { algorithm: string; signingMessage: string };
 }
+interface User { name: string; email: string; role: string }
+
+function Row({ title, sub, children }: { title: string; sub?: string; children: ReactNode }) {
+  return (
+    <div className="grid gap-4 border-t border-line-2 pt-6 first:border-ink md:grid-cols-[200px_1fr] md:gap-8">
+      <div className="flex flex-col gap-1"><span className="text-[15px] font-semibold">{title}</span>{sub && <span className="text-[13px] text-mute">{sub}</span>}</div>
+      <div className="min-w-0">{children}</div>
+    </div>
+  );
+}
+const ro = "inp !border-line-2 !bg-hov !text-mute";
 
 export default function Settings() {
+  const nav = useNavigate();
   const { data, error, loading, reload } = useApi(() => api.get<CryptoInfo>("/crypto"));
-  const [pem, setPem] = useState<CryptoInfo["signers"][number] | null>(null);
+  const stored = (() => { try { return JSON.parse(localStorage.getItem("qs-user") || "null") as Partial<User> | null; } catch { return null; } })();
+  const [user, setUser] = useState<User>({ name: stored?.name ?? "Ravi Kumar", email: stored?.email ?? "ravi.kumar@sro-vzm.ap.gov.in", role: stored?.role ?? "Registry officer" });
+  const [saved, setSaved] = useState(false);
   const [confirm, setConfirm] = useState(false);
-  const reset = useAction(async () => { await api.post("/admin/reset"); setConfirm(false); window.location.assign("/"); });
+  const reset = useAction(async () => { await api.post("/admin/reset"); window.location.assign("/app"); });
 
-  if (loading) return <Loading />;
+  if (loading && !data) return <Loading />;
   if (error || !data) return <ErrorState error={error ?? new Error("No data")} onRetry={reload} />;
+  const key = data.signers.find((s) => s.id === "revenue-ap")!;
+  const download = () => {
+    const url = URL.createObjectURL(new Blob([key.publicKeyPem], { type: "application/x-pem-file" }));
+    const a = document.createElement("a"); a.href = url; a.download = `${key.id}-ml-dsa-65-public.pem`; a.click(); URL.revokeObjectURL(url);
+  };
 
   return (
-    <div>
-      <PageHeader title="Cryptography & configuration" description="What protects each record, which keys exist, and the limits of this prototype." actions={<Button variant="danger" onClick={() => setConfirm(true)} icon={<RefreshCcw className="h-4 w-4" />}>Reset demo data</Button>} />
+    <div className="flex max-w-[900px] flex-col gap-8">
+      <PageTitle title="Settings" sub="Profile, signing key and demo data." />
 
-      <div className="grid gap-x-12 gap-y-10 lg:grid-cols-3">
-        <Section title="Signature algorithms" className="lg:col-span-2">
-          <div className="grid gap-4 md:grid-cols-2">
-            {data.schemes.map((s) => (
-              <div key={s.id} className={s.family === "POST_QUANTUM" ? "rounded-lg border border-brand-500/40 bg-brand-500/[0.05] p-4" : "rounded-lg border border-ink-700 p-4"}>
-                <div className="flex items-center justify-between"><span className="text-base font-semibold text-white">{s.displayName}</span><Pill tone={s.family === "POST_QUANTUM" ? "blue" : "amber"}>{s.family === "POST_QUANTUM" ? "Post-quantum" : "Classical · legacy only"}</Pill></div>
-                <div className="mt-2 text-xs text-slate-300">{s.standard}</div>
-                <p className="mt-2 text-xs leading-relaxed text-slate-400">{s.securityNote}</p>
-                {s.id === data.defaultAlgorithm && <div className="mt-3"><Pill tone="green">Default for all new signatures</Pill></div>}
-              </div>
-            ))}
-          </div>
-        </Section>
-        <Section title="Runtime">
-          <div className="space-y-4">
-            <KV label="Implementation">Node.js <span className="font-mono">{data.runtime.node}</span> crypto, backed by OpenSSL <span className="font-mono">{data.runtime.openssl}</span> (native ML-DSA provider)</KV>
-            <KV label="Content hash">{data.hashing.algorithm}</KV>
-            <KV label="Canonicalisation">{data.hashing.canonicalization}</KV>
-            <KV label="Signed message" mono>{data.hashing.signingMessage}</KV>
-          </div>
-        </Section>
-      </div>
+      <Row title="Profile" sub="Shown in the account menu. Stored in this browser only.">
+        <form className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3.5" onSubmit={(e) => { e.preventDefault(); localStorage.setItem("qs-user", JSON.stringify(user)); setSaved(true); setTimeout(() => setSaved(false), 1800); }}>
+          <Field label="Full name"><input className="inp" value={user.name} onChange={(e) => setUser({ ...user, name: e.target.value })} /></Field>
+          <Field label="Work email"><input className="inp" value={user.email} onChange={(e) => setUser({ ...user, email: e.target.value })} /></Field>
+          <Field label="Role"><input className={ro} value={user.role} disabled /></Field>
+          <Field label="Organisation"><input className={ro} value="Sub-Registrar Office, Vizianagaram" disabled /></Field>
+          <div className="col-span-full flex items-center gap-3"><Btn type="submit" size="sm">Save profile</Btn>{saved && <span className="text-[13px] text-ok">Saved</span>}</div>
+        </form>
+      </Row>
 
-      <Section title="Signer registry" description="Public keys only. Private keys never leave the server and are never sent to the browser." className="mt-12">
-        <div className="overflow-x-auto rounded-lg border border-ink-700">
-          <table className="w-full min-w-[820px] text-[13px]">
-            <thead className="border-b border-ink-700 bg-ink-900"><tr><th className="th">Signer</th><th className="th">Role</th><th className="th">Algorithm</th><th className="th">Public key</th><th className="th">SPKI fingerprint (SHA-256)</th><th className="th" /></tr></thead>
-            <tbody className="divide-y divide-ink-800">
-              {data.signers.map((s) => (
-                <tr key={s.id}>
-                  <td className="td"><div className="font-medium text-white">{s.name}</div><div className="text-[11px] text-slate-500">{s.organization}</div></td>
-                  <td className="td font-mono text-[11px] text-slate-300">{s.role}</td>
-                  <td className="px-3 py-3"><Pill tone={s.algorithm.startsWith("ML-DSA") ? "blue" : "amber"}>{s.algorithm}</Pill></td>
-                  <td className="td text-xs text-slate-300">{s.publicKeyBytes.toLocaleString()} bytes</td>
-                  <td className="px-3 py-3"><Hash value={s.fingerprint} n={8} /></td>
-                  <td className="td text-right"><Button size="sm" variant="ghost" onClick={() => setPem(s)}>View PEM</Button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <Row title="Signing key" sub="Used to sign land records created in this workspace.">
+        <div className="rounded border border-line bg-card">
+          {[
+            ["Algorithm", `${key.algorithm} (FIPS 204)`],
+            ["Signer", `${key.name}, ${key.organization.replace(" (fictional demo)", "")}`],
+            ["Key fingerprint", <Hash key="f" value={key.fingerprint} n={8} className="text-[13px]" />],
+            ["Registered", formatDate(key.createdAt)],
+            ["Private key storage", "Server-side key file (prototype). Production: HSM or cloud KMS."],
+          ].map(([k, v]) => <div key={k as string} className="flex justify-between gap-4 border-b border-line-3 px-[18px] py-3 text-[14px]"><span className="text-mute">{k}</span><span className="text-right">{v}</span></div>)}
+          <div className="flex flex-wrap items-center gap-2.5 px-[18px] py-3.5">
+            <Btn variant="outline" size="sm" onClick={download}>Download public key</Btn>
+            <Btn variant="outline" size="sm" disabled title="Not implemented in the prototype">Rotate key</Btn>
+            <span className="text-[12px] text-mute">Key rotation and revocation are production features.</span>
+          </div>
         </div>
-      </Section>
+        <p className="mb-0 mt-3 text-[12px] leading-relaxed text-mute">Runtime: Node.js {data.runtime.node} · OpenSSL {data.runtime.openssl} · content hash {data.hashing.algorithm}. Private keys never leave the server and are never sent to the browser.</p>
+      </Row>
 
-      <div className="mt-12 grid gap-x-12 gap-y-10 lg:grid-cols-2">
-        <Section title="Key custody"><p className="text-sm leading-relaxed text-slate-300">{data.keyCustody}</p></Section>
-        <Section title="Prototype limitations">
-          <ul className="list-disc space-y-1.5 pl-5 text-sm text-slate-300">
-            <li>Single-node ledger: no distributed consensus or replication.</li>
-            <li>No user authentication or role-based access control.</li>
-            <li>Keys stored as files, not in an HSM or KMS; no rotation or revocation.</li>
-            <li>No trusted timestamping authority; timestamps come from the server clock.</li>
-            <li>Not independently security-reviewed. All data is fictional.</li>
-          </ul>
-        </Section>
-      </div>
+      <Row title="Signer registry" sub="Public keys only.">
+        <TableCard min={640}>
+          <thead className={theadCls}><tr><th className="th">Signer</th><th className="th">Role</th><th className="th">Algorithm</th><th className="th">Fingerprint</th></tr></thead>
+          <tbody>{data.signers.map((s) => (
+            <tr key={s.id} className={rowCls}>
+              <td className="td"><div className="flex flex-col"><span>{s.name}</span><span className="text-[12px] text-mute">{s.organization.replace(/ \(fictional( demo)?\)/, "")}</span></div></td>
+              <td className="td font-mono text-[12px] text-mute">{s.role}</td><td className="td">{s.algorithm}</td><td className="td font-mono text-[12px]">{shortHash(s.fingerprint, 8)}</td>
+            </tr>
+          ))}</tbody>
+        </TableCard>
+      </Row>
 
-      <Modal open={!!pem} onClose={() => setPem(null)} title={`${pem?.name} · public key`} wide>
-        {pem && (
-          <div className="space-y-3">
-            <div className="text-xs text-slate-400">{pem.algorithm} · registered {formatDateTime(pem.createdAt)}</div>
-            <pre className="max-h-96 overflow-auto rounded-lg bg-ink-950/70 p-3 font-mono text-[10.5px] text-slate-300">{pem.publicKeyPem}</pre>
-          </div>
-        )}
-      </Modal>
-      <Modal open={confirm} onClose={() => setConfirm(false)} title="Reset demo data?" tone="red">
-        <p className="text-sm text-slate-300">Deletes all records, ledger blocks and audit entries, then re-seeds the fictional dataset (2,481 signed entities). Signer keys are kept. This takes a few seconds.</p>
-        <InlineError error={reset.error} />
-        <div className="mt-4 flex justify-end gap-2"><Button variant="ghost" onClick={() => setConfirm(false)}>Cancel</Button><Button variant="danger" loading={reset.pending} onClick={() => reset.run()}>Reset &amp; re-seed</Button></div>
+      <Row title="Notifications" sub="Email alerts for your district.">
+        <div className="flex flex-col gap-3.5 text-[14px] opacity-60">
+          {["Integrity violations", "Daily integrity scan summary", "Every new block in my district"].map((l) => <label key={l} className="flex items-center gap-2.5"><input type="checkbox" disabled className="h-4 w-4 accent-ink" />{l}</label>)}
+        </div>
+        <p className="mb-0 mt-3 text-[12px] text-mute">Email delivery is not connected in this prototype.</p>
+      </Row>
+
+      <Row title="Demo data" sub="All records are fictional.">
+        <Btn variant="danger" onClick={() => setConfirm(true)}>Reset demo data</Btn>
+        <p className="mb-0 mt-3 text-[12px] text-mute">Deletes all records, ledger blocks and audit entries and re-seeds the dataset. Signer keys are kept.</p>
+      </Row>
+
+      <Row title="Session"><Btn variant="danger" onClick={() => { localStorage.removeItem("qs-user"); nav("/signin"); }}>Sign out</Btn></Row>
+
+      <Modal open={confirm} onClose={() => setConfirm(false)} title="Reset demo data?" subtitle="This takes a few seconds."
+        footer={<><Btn variant="outline" onClick={() => setConfirm(false)}>Cancel</Btn><Btn loading={reset.pending} onClick={() => reset.run()}>Reset and re-seed</Btn></>}>
+        <p className="m-0 text-[14px] leading-relaxed text-body">All current records, tamper simulations, migrations and audit entries will be replaced with the original fictional dataset (2,481 signed entities).</p>
+        <div className="mt-3"><InlineError error={reset.error} /></div>
       </Modal>
     </div>
   );

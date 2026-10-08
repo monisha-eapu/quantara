@@ -1,110 +1,51 @@
 @import "tailwindcss";
 
-/*
- * QuantumShield design tokens.
- * Dark navy surfaces, white/grey type, blue reserved for interaction and security state.
- * Radii are deliberately small (6–10px); there are no gradients, glows or blurred glass.
- */
+/* Design tokens, taken from the QuantumShield design file (warm paper palette). */
 @theme {
-  /* SF Pro on Apple devices (system font), Inter everywhere else. */
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter Variable", "Segoe UI", system-ui, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono Variable", SFMono-Regular, Menlo, monospace;
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-serif: "Newsreader Variable", "Newsreader", serif;
 
-  /* Surfaces: 950 canvas · 900 primary surface · 850/800 secondary · 700/600 borders */
-  --color-ink-950: #080c12;
-  --color-ink-900: #0d131c;
-  --color-ink-850: #0f1620;
-  --color-ink-800: #111923;
-  --color-ink-700: #202b38;
-  --color-ink-600: #2a3745;
-
-  /* Text: primary #f5f7fa · secondary #9aa6b2 · muted #667383 (remapped onto Tailwind's slate scale) */
-  --color-slate-50: #f5f7fa;
-  --color-slate-100: #f5f7fa;
-  --color-slate-200: #dfe4ea;
-  --color-slate-300: #bcc5cf;
-  --color-slate-400: #9aa6b2;
-  --color-slate-500: #667383;
-  --color-slate-600: #4b5866;
-
-  /* Accent blue: interaction and security state only */
-  --color-brand-300: #8bb8ff;
-  --color-brand-400: #5b9bff;
-  --color-brand-500: #2f7bff;
-  --color-brand-600: #1f66e6;
-
-  /* The Quantum Lab shares the same blue accent (no second brand colour) */
-  --color-quantum-400: #8bb8ff;
-  --color-quantum-500: #2f7bff;
-
-  /* Status */
-  --color-emerald-300: #6ee7a0;
-  --color-emerald-400: #22c55e;
-  --color-emerald-500: #22c55e;
-  --color-amber-300: #fbbf5c;
-  --color-amber-400: #f59e0b;
-  --color-amber-500: #f59e0b;
-  --color-red-300: #fca5a5;
-  --color-red-400: #f87171;
-  --color-red-500: #ef4444;
-
-  /* Restrained corner radius everywhere */
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 6px;
-  --radius-xl: 8px;
-  --radius-2xl: 10px;
+  --color-paper: #f6f4ee;      /* page */
+  --color-card: #fffefb;       /* surfaces */
+  --color-side: #efebe3;       /* sidebar */
+  --color-line: #d3cec2;       /* borders */
+  --color-line-2: #e2ded4;     /* soft borders */
+  --color-line-3: #ece8df;     /* row dividers */
+  --color-line-4: #c9c3b5;     /* button borders */
+  --color-ink: #191917;
+  --color-body: #4a4943;
+  --color-mute: #77756c;
+  --color-faint: #9a978d;
+  --color-hov: #f1eee6;
+  --color-hov-2: #e6e1d6;
+  --color-ok: #1e6a48;
+  --color-ok-bg: #e7f0ea;
+  --color-bad: #b0291f;
+  --color-bad-bg: #f8e9e6;
+  --color-bad-line: #e0b4ad;
+  --color-warn: #8a5a00;
+  --color-warn-bg: #f6eedb;
+  --color-warn-line: #e3cf9e;
+  --color-ink-hover: #33332f;
 }
 
-:root { color-scheme: dark; }
-
-html, body {
-  background: #080c12;
-  color: #f5f7fa;
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-  font-feature-settings: "cv11", "ss01", "tnum";
+/* Base rules live in the base layer so Tailwind colour/size utilities can override them. */
+@layer base {
+  html, body { background: #f6f4ee; color: #191917; font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+  body { margin: 0; min-height: 100vh; }
+  * { box-sizing: border-box; }
+  a { color: inherit; }
+  input, select, button, textarea { font-family: inherit; color: inherit; }
+  input::placeholder { color: #9a978d; }
+  input:focus, select:focus, button:focus-visible, [tabindex]:focus-visible { outline: 2px solid #191917; outline-offset: -1px; }
+  button:disabled { cursor: not-allowed; opacity: 0.5; }
+  ::selection { background: #191917; color: #f6f4ee; }
 }
-body { min-height: 100vh; line-height: 1.5; }
-
-h1, h2, h3 { letter-spacing: -0.015em; }
 
 @layer components {
-  /* Flat surface. Used sparingly, only to group genuinely related information. */
-  .glass {
-    background: #0d131c;
-    border: 1px solid #202b38;
-  }
-  /* Legacy emphasis classes now map to a coloured hairline only; no glow. */
-  .glow-blue   { border-color: rgba(47, 123, 255, 0.5) !important; }
-  .glow-green  { border-color: rgba(34, 197, 94, 0.45) !important; }
-  .glow-red    { border-color: rgba(239, 68, 68, 0.55) !important; }
-  .glow-amber  { border-color: rgba(245, 158, 11, 0.45) !important; }
-  .glow-violet { border-color: rgba(47, 123, 255, 0.5) !important; }
-
-  .label {
-    @apply text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500;
-  }
-  .input {
-    @apply w-full rounded-md border border-ink-700 bg-ink-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20;
-  }
-  .th { @apply px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500; }
-  .td { @apply px-4 py-3; }
+  .inp { @apply w-full rounded border border-line bg-card px-3.5 py-[11px] text-[14px] font-normal; }
+  .th { @apply px-5 py-3 text-left text-[11px] font-normal uppercase tracking-[0.1em] text-mute; }
+  .td { @apply px-5 py-3.5 align-middle; }
+  .eyebrow { @apply text-[11px] uppercase tracking-[0.1em] text-mute; }
 }
-
-/* Motion is limited to state changes. */
-@keyframes fade-up { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
-.fade-up { animation: fade-up 0.18s ease-out both; }
-.pulse-red { animation: none; }
-
-@keyframes busy { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
-.scanline { animation: busy 1.4s ease-in-out infinite; }
-
-@media (prefers-reduced-motion: reduce) {
-  .fade-up, .scanline { animation: none; }
-}
-
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: #202b38; border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
-::-webkit-scrollbar-track { background: transparent; }

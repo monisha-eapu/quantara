@@ -54,7 +54,11 @@ const toEntry = (r: AuditRow): AuditEntry => ({
 export function listAudit(opts: { limit?: number; offset?: number; action?: string; result?: string; q?: string }) {
   const where: string[] = [];
   const params: (string | number)[] = [];
-  if (opts.action) { where.push("action = ?"); params.push(opts.action); }
+  if (opts.action) {
+    const actions = opts.action.split(",").map((a) => a.trim()).filter(Boolean);
+    where.push(`action IN (${actions.map(() => "?").join(",")})`);
+    params.push(...actions);
+  }
   if (opts.result) { where.push("result = ?"); params.push(opts.result); }
   if (opts.q) {
     where.push("(record_id LIKE ? OR actor LIKE ? OR action LIKE ? OR details LIKE ?)");

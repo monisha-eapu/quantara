@@ -182,8 +182,8 @@ On first start the database is seeded automatically. The seed creates 2,481 sign
 
 ## 13. Demo instructions (3–5 minutes)
 
-1. **Dashboard**: "2,481 protected records", "Post-quantum (ML-DSA) verification online", system status panel.
-2. **Land Registry** → open **LAND-AP-VZM-10293** (Ravi Kumar · Survey 184/2 · 2.4 acres). The cryptographic seal shows ML-DSA-65, signature VALID, hash VERIFIED, ledger VERIFIED.
+1. **Overview**: "2,481 protected records", "Post-quantum (ML-DSA) verification online", system status panel.
+2. **Land Records** → open **LAND-AP-VZM-10293** (Ravi Kumar · Survey 184/2 · 2.4 acres). The cryptographic seal shows ML-DSA-65, signature VALID, hash VERIFIED, ledger VERIFIED.
 3. **VERIFY RECORD** → 🟢 AUTHENTIC RECORD (five checks pass).
 4. **SIMULATE TAMPERING** → owner *Ravi Kumar* → *Raj Kumar* (pre-filled).
 5. **VERIFY AGAIN** → ❌ Hash mismatch · ❌ Signature invalid · ❌ Ledger anchor mismatch → 🚨 **RECORD TAMPERED**. The original vs current hash and the altered field are shown. *Optional:* repeat with "recompute the stored hash" to show the signature still catches it.
@@ -193,7 +193,7 @@ On first start the database is seeded automatically. The seed creates 2,481 sign
 9. **Quantum Threat Lab** → *Shor Order-Finding (N = 15)* → run on the noisy IBM-device simulator, or on **IBM Quantum hardware** if a token is set. Point out the "Reality check" box and the separation banner.
 10. *(Optional)* **Ledger Explorer** → open a block → "Edit block and recompute its hash" → **Verify entire ledger** → FAILED at the next block → restore.
 
-To reset everything: **Cryptography → Reset demo data**, or `npm run seed`.
+To reset everything: **Settings → Reset demo data**, or `npm run seed`.
 
 ## 14. Quantum Threat Lab (IBM Quantum)
 
@@ -229,6 +229,10 @@ There are three execution targets: a local ideal simulator (Aer), a local noisy 
 - **Timestamping:** RFC 3161 TSA with PQC signatures; periodic anchoring of the ledger tip to an external transparency log.
 - **Privacy:** store personal data off-chain (encrypted, ML-KEM for key exchange); ledger keeps only hashes.
 - **Assurance:** signed audit logs, monitoring and alerting, penetration testing, formal security review.
+
+## Frontend
+
+React + Vite + Tailwind, built to the QuantumShield design file: warm paper palette, Newsreader headings, IBM Plex Sans and Mono (self-hosted via fontsource, so no network is needed for fonts). Public pages are `/`, `/signin`, `/signup`, `/forgot`; the workspace lives under `/app`. The sign-in screens are a UI stub: the prototype has no identity provider, so any entry opens the workspace.
 
 ## Repository layout
 

@@ -1,235 +1,151 @@
-import { ArrowDown, FlaskConical, Link2, Link2Off, RotateCcw, Search, ShieldCheck, ShieldX } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router";
-import { Button, CheckIcon, cx, Empty, ErrorState, Hash, InlineError, KV, Loading, Modal, PageHeader, Pill, Section } from "../components/ui";
+import { Banner, Btn, cx, ErrorState, Hash, InlineError, KV, Loading, Modal, PageTitle, SectionHead, Status } from "../components/ui";
 import { api, type Block, type ChainReport } from "../lib/api";
 import { formatDateTime, nf } from "../lib/format";
 import { useAction } from "../lib/hooks";
 
-interface ListedBlock extends Block { hashValid: boolean; linkValid: boolean }
-interface BlockInspection {
-  block: Block;
-  canonicalHeader: string;
-  recomputedHash: string;
+interface Listed extends Block { hashValid: boolean; linkValid: boolean }
+interface Inspection {
+  block: Block; canonicalHeader: string; recomputedHash: string;
   checks: { blockHashValid: boolean; previousLinkValid: boolean; nextLinkValid: boolean | null; signatureValid: boolean };
-  previousBlock: { index: number; blockHash: string } | null;
-  nextBlock: { index: number; previousHash: string } | null;
-  signatureBytes: number;
+  previousBlock: { index: number; blockHash: string } | null; signatureBytes: number;
 }
 
-const PAGE = 10;
-const TYPE_LABEL: Record<string, string> = { LAND_RECORD: "Land record", SUPPLY_PRODUCT: "Product", SUPPLY_EVENT: "Provenance event", GENESIS: "Genesis" };
-const recordHref = (b: Block) => b.recordType === "LAND_RECORD" ? `/records/${b.recordId}` : b.recordType === "SUPPLY_PRODUCT" ? `/supply-chain/${b.recordId}` : b.recordType === "SUPPLY_EVENT" ? `/supply-chain/${b.recordId.replace(/-E\d+$/, "")}` : null;
-const hhmmss = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { hour12: false });
+const PAGE = 8;
+const KIND: Record<string, string> = { LAND_RECORD: "Land record", SUPPLY_PRODUCT: "Product", SUPPLY_EVENT: "Provenance event", GENESIS: "Genesis" };
+const href = (b: Block) => b.recordType === "LAND_RECORD" ? `/app/records/${b.recordId}` : b.recordType === "SUPPLY_PRODUCT" ? `/app/supply-chain/${b.recordId}` : b.recordType === "SUPPLY_EVENT" ? `/app/supply-chain/${b.recordId.replace(/-E\d+$/, "")}` : null;
+const when = (iso: string) => new Date(iso).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).replace(",", ",");
 
 export default function Ledger() {
   const [params, setParams] = useSearchParams();
-  const [blocks, setBlocks] = useState<ListedBlock[]>([]);
+  const [blocks, setBlocks] = useState<Listed[]>([]);
   const [total, setTotal] = useState(0);
-  const [loadError, setLoadError] = useState<Error | null>(null);
+  const [err, setErr] = useState<Error | null>(null);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("");
+  const [find, setFind] = useState("");
   const [report, setReport] = useState<ChainReport | null>(null);
   const selected = params.get("block");
 
-  const load = async (opts: { before?: number; recordId?: string; append?: boolean } = {}) => {
+  const load = async (o: { before?: number; recordId?: string; append?: boolean } = {}) => {
     setLoading(true);
     try {
       const q = new URLSearchParams({ limit: String(PAGE) });
-      if (opts.before !== undefined) q.set("before", String(opts.before));
-      if (opts.recordId) q.set("recordId", opts.recordId);
-      const res = await api.get<{ blocks: ListedBlock[]; total: number }>(`/ledger?${q}`);
-      setBlocks((prev) => (opts.append ? [...prev, ...res.blocks] : res.blocks));
-      setTotal(res.total);
-      setLoadError(null);
-    } catch (e) {
-      setLoadError(e as Error);
-    } finally {
-      setLoading(false);
-    }
+      if (o.before !== undefined) q.set("before", String(o.before));
+      if (o.recordId) q.set("recordId", o.recordId);
+      const r = await api.get<{ blocks: Listed[]; total: number }>(`/ledger?${q}`);
+      setBlocks((p) => (o.append ? [...p, ...r.blocks] : r.blocks)); setTotal(r.total); setErr(null);
+    } catch (e) { setErr(e as Error); } finally { setLoading(false); }
   };
   useEffect(() => { load(); }, []);
 
   const verify = useAction(async () => setReport(await api.get<ChainReport>("/ledger/verify")));
   const search = (e: React.FormEvent) => {
     e.preventDefault();
-    const v = filter.trim();
+    const v = find.trim();
     if (!v) return load();
-    if (/^#?\d+$/.test(v)) setParams({ block: v.replace("#", "") });
-    else load({ recordId: v.toUpperCase() });
+    if (/^#?\d+$/.test(v)) setParams({ block: v.replace("#", "") }); else load({ recordId: v.toUpperCase() });
   };
-  const refresh = async () => { await load(); if (report) await verify.run(); };
+  const verified = report?.valid;
 
   return (
-    <div>
-      <PageHeader
-        title="Ledger"
-        description="An append-only chain. Each block commits to its content and to the hash of the block before it, so altering any past block is detectable."
-        actions={<Button variant="primary" size="lg" onClick={() => verify.run()} loading={verify.pending} icon={<ShieldCheck className="h-4 w-4" />}>Verify entire ledger</Button>}
-      />
-
-      {verify.error && <div className="mb-5"><InlineError error={verify.error} /></div>}
-      {report && (
-        <div className={cx("fade-up mb-8 rounded-lg border px-5 py-4", report.valid ? "border-emerald-500/45 bg-emerald-500/[0.06]" : "border-red-500/50 bg-red-500/[0.07]")} role="status">
-          <div className="flex items-start gap-4">
-            {report.valid ? <ShieldCheck className="mt-0.5 h-6 w-6 text-emerald-400" /> : <ShieldX className="mt-0.5 h-6 w-6 text-red-400" />}
-            <div className="min-w-0 flex-1">
-              <div className={cx("text-[22px] font-bold leading-tight", report.valid ? "text-emerald-300" : "text-red-300")}>{report.valid ? "LEDGER INTEGRITY VERIFIED" : "LEDGER INTEGRITY FAILED"}</div>
-              <div className="mt-1 text-[13px] text-slate-300">{nf.format(report.totalBlocks)} block hashes recomputed · {nf.format(report.totalBlocks - 1)} links checked · {nf.format(report.totalBlocks)} signatures verified · {report.durationMs} ms</div>
-              {!report.valid && (
-                <ul className="mt-3 space-y-1.5 text-[13px]">
-                  {report.issues.slice(0, 6).map((i, k) => (
-                    <li key={k} className="flex flex-wrap items-center gap-2"><Pill tone="red">{i.kind.replace(/_/g, " ")}</Pill><button className="text-left text-red-200 hover:underline" onClick={() => setParams({ block: String(i.index) })}>{i.message}</button></li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-        </div>
+    <div className="flex flex-col gap-7">
+      <PageTitle title="Ledger" sub="An append-only chain. Each block commits to its content and to the hash of the block before it, so altering any past block is detectable."
+        actions={<Btn className="!py-3" loading={verify.pending} onClick={() => verify.run()}>{verified ? `Ledger verified · ${nf.format(report!.totalBlocks)} blocks` : "Verify entire ledger"}</Btn>} />
+      <InlineError error={verify.error} />
+      {report && !report.valid && (
+        <Banner tone="bad" title="LEDGER INTEGRITY FAILED">
+          {nf.format(report.issues.length)} issue(s). {report.issues.slice(0, 4).map((i, k) => <button key={k} onClick={() => setParams({ block: String(i.index) })} className="mt-1 block cursor-pointer border-0 bg-transparent p-0 text-left text-[14px] text-bad underline underline-offset-[3px]">{i.message}</button>)}
+        </Banner>
       )}
+      {report?.valid && <Banner tone="ok" title="LEDGER INTEGRITY VERIFIED">{nf.format(report.totalBlocks)} block hashes recomputed, {nf.format(report.totalBlocks - 1)} links checked and {nf.format(report.totalBlocks)} signatures verified in {report.durationMs} ms.</Banner>}
 
-      <div className="grid gap-x-12 gap-y-10 xl:grid-cols-[minmax(0,1fr)_300px]">
-        <Section
-          title="Blocks"
-          description={`${nf.format(total)} blocks, newest first. Select a block to inspect it.`}
-          actions={
-            <form onSubmit={search} className="flex gap-2">
-              <input className="input h-8 w-52 py-1 text-[13px]" placeholder="Block # or record ID" aria-label="Find block" value={filter} onChange={(e) => setFilter(e.target.value)} />
-              <Button size="sm" type="submit" icon={<Search className="h-3.5 w-3.5" />}>Find</Button>
-            </form>
-          }
-        >
-          {loadError ? <ErrorState error={loadError} onRetry={() => load()} /> : loading && !blocks.length ? <Loading /> : !blocks.length ? (
-            <Empty title="No blocks found" description="No ledger block matches that record ID." action={<Button size="sm" onClick={() => { setFilter(""); load(); }}>Show all blocks</Button>} />
-          ) : (
-            <div>
-              {blocks.map((b, i) => {
-                const bad = !b.hashValid || !b.linkValid;
-                const older = blocks[i + 1];
-                const contiguous = older && older.index === b.index - 1;
-                return (
-                  <div key={b.index}>
-                    <div
-                      role="button" tabIndex={0}
-                      onClick={() => setParams({ block: String(b.index) })}
-                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setParams({ block: String(b.index) }); } }}
-                      className={cx("cursor-pointer rounded-lg border px-4 py-3.5 transition-colors", bad ? "border-red-500/50 bg-red-500/[0.06]" : "border-ink-700 bg-ink-900 hover:border-ink-600 hover:bg-ink-850")}
-                    >
-                      <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <div className="flex items-baseline gap-3"><span className="font-mono text-[16px] font-semibold text-white">Block #{b.index}</span><span className="text-xs text-slate-500">{TYPE_LABEL[b.recordType] ?? b.recordType} · {b.action.toLowerCase()}</span></div>
-                        <div className="flex items-center gap-2 text-xs text-slate-500">
-                          {bad && <Pill tone="red">Integrity failure</Pill>}
-                          <span className="font-mono">{hhmmss(b.timestamp)}</span><span>{formatDateTime(b.timestamp).split(",").slice(0, 2).join(",")}</span>
-                        </div>
-                      </div>
-                      <dl className="mt-3 grid gap-x-6 gap-y-2.5 sm:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr_0.7fr]">
-                        <KV label="Record"><span className="font-mono text-[12px]">{b.recordId}</span></KV>
-                        <KV label="Previous hash"><Hash value={b.previousHash} n={6} tone={b.linkValid ? undefined : "red"} /></KV>
-                        <KV label="Current hash"><Hash value={b.blockHash} n={6} tone={b.hashValid ? undefined : "red"} /></KV>
-                        <KV label="Signature"><span className="text-[12px] text-slate-300">{b.algorithm}</span></KV>
-                      </dl>
-                    </div>
-                    {contiguous && (
-                      <div className="flex items-center gap-2 py-1.5 pl-5 text-[11px]">
-                        <ArrowDown className={cx("h-3.5 w-3.5", b.linkValid ? "text-slate-500" : "text-red-400")} />
-                        {b.linkValid
-                          ? <span className="flex items-center gap-1.5 text-slate-500"><Link2 className="h-3 w-3 text-emerald-400" /> previous hash of #{b.index} equals current hash of #{older.index}</span>
-                          : <span className="flex items-center gap-1.5 font-semibold text-red-300"><Link2Off className="h-3 w-3" /> Broken link: #{b.index} does not point to the current hash of #{older.index}</span>}
-                      </div>
-                    )}
-                    {!contiguous && i < blocks.length - 1 && <div className="py-2 pl-5 text-[11px] text-slate-600">⋯</div>}
+      <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+        <div className="flex flex-col">
+          <SectionHead className="mb-4" title="Blocks" sub={`${nf.format(total)} blocks, newest first. Select a block to inspect it.`}
+            right={<form onSubmit={search} className="flex gap-2"><input className="inp !w-44 !py-2 !text-[13px]" aria-label="Find block" placeholder="Block # or record ID" value={find} onChange={(e) => setFind(e.target.value)} /><Btn variant="outline" size="sm" type="submit">Find</Btn></form>} />
+          {err ? <ErrorState error={err} onRetry={() => load()} /> : loading && !blocks.length ? <Loading /> : !blocks.length ? <p className="text-[14px] text-mute">No block matches that record ID. <button className="cursor-pointer border-0 bg-transparent p-0 underline" onClick={() => { setFind(""); load(); }}>Show all blocks</button></p> : blocks.map((b, i) => {
+            const bad = !b.hashValid || !b.linkValid;
+            const older = blocks[i + 1];
+            return (
+              <div key={b.index} className="flex flex-col">
+                <div role="button" tabIndex={0} onClick={() => setParams({ block: String(b.index) })} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setParams({ block: String(b.index) }); } }}
+                  className={cx("flex cursor-pointer flex-col gap-3.5 rounded border bg-card px-[22px] py-[18px] hover:border-ink", bad ? "border-bad" : "border-line")}>
+                  <div className="flex flex-wrap items-baseline justify-between gap-3">
+                    <span className="flex items-baseline gap-3"><span className="font-mono text-[17px] font-medium">Block #{b.index}</span><span className="text-[13px] text-mute">{KIND[b.recordType] ?? b.recordType} · {b.action.toLowerCase()}</span>{bad && <Status tone="bad" className="text-[13px] font-medium">Integrity failure</Status>}</span>
+                    <span className="font-mono text-[12px] text-mute">{when(b.timestamp)}</span>
                   </div>
-                );
-              })}
-              {blocks.length > 0 && blocks[blocks.length - 1].index > 0 && !filter && (
-                <div className="mt-5"><Button size="sm" loading={loading} onClick={() => load({ before: blocks[blocks.length - 1].index, append: true })}>Load older blocks</Button></div>
-              )}
-            </div>
-          )}
-        </Section>
+                  <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3 font-mono text-[13px]">
+                    <KV label="Record"><span className="break-all font-mono text-[13px]">{b.recordId}</span></KV>
+                    <KV label="Previous hash"><Hash value={b.previousHash} className={cx("text-[13px]", !b.linkValid && "text-bad")} /></KV>
+                    <KV label="Current hash"><Hash value={b.blockHash} className={cx("text-[13px]", !b.hashValid && "text-bad")} /></KV>
+                    <KV label="Signature"><span className="font-mono text-[13px]">{b.algorithm}</span></KV>
+                  </div>
+                </div>
+                {older && older.index === b.index - 1 && (
+                  <span className={cx("ml-[22px] border-l border-line-4 py-2.5 pl-[22px] font-mono text-[12px]", b.linkValid ? (verified ? "text-ok" : "text-mute") : "text-bad")}>↓ prev of #{b.index} {b.linkValid ? "=" : "≠"} hash of #{b.index - 1}{verified && b.linkValid ? "  ✓" : ""}</span>
+                )}
+                {older && older.index !== b.index - 1 && <span className="py-2 pl-[22px] text-[12px] text-faint">⋯</span>}
+              </div>
+            );
+          })}
+          {blocks.length > 0 && blocks[blocks.length - 1].index > 0 && !find && <div className="mt-5"><Btn variant="outline" size="sm" loading={loading} onClick={() => load({ before: blocks[blocks.length - 1].index, append: true })}>Load older blocks</Btn></div>}
+        </div>
 
-        <div className="space-y-9">
-          <Section title="How a block is built">
-            <pre className="overflow-x-auto rounded-lg border border-ink-700 bg-ink-900 p-3.5 font-mono text-[11.5px] leading-relaxed text-slate-300">{`index
+        <div className="sticky top-[84px] flex flex-col gap-5">
+          <SectionHead title="How a block is built" />
+          <pre className="m-0 overflow-x-auto rounded border border-line bg-card p-[18px] font-mono text-[12.5px] leading-[1.7]">{`index
 timestamp
 recordId · recordType · action
 dataHash       SHA-256 of record
 signature      ML-DSA-65
 signer
 previousHash   hash of block n-1
-─────────────────────────────
+──────────────────────────────
 blockHash = SHA-256(all of the above)`}</pre>
-            <p className="mt-3 text-[13px] leading-relaxed text-slate-400">A single-node permissioned ledger for the prototype. There is no mining or token. A production deployment would replicate it across independent authorities with Byzantine fault-tolerant consensus.</p>
-          </Section>
-          <Section title="What protects what">
-            <p className="text-[13px] leading-relaxed text-slate-400">The hash chain makes history tamper-evident. It is not what makes the system post-quantum: SHA-256 links are expected to remain sound against known quantum attacks. What needs replacing for the quantum era is the signature scheme, so every block carries an ML-DSA signature.</p>
-          </Section>
+          <p className="m-0 text-[14px] leading-[1.7] text-body">A single-node permissioned ledger for the prototype. There is no mining or token. A production deployment would replicate it across independent authorities with Byzantine fault-tolerant consensus.</p>
+          <SectionHead className="mt-3" title="What protects what" />
+          <p className="m-0 text-[14px] leading-[1.7] text-body">The hash chain makes history tamper-evident. It is not what makes the system post-quantum: SHA-256 links are expected to remain sound against known quantum attacks. What needs replacing for the quantum era is the signature scheme, so every block carries an ML-DSA signature.</p>
         </div>
       </div>
-
-      {selected !== null && <BlockModal index={Number(selected)} onClose={() => setParams({})} onChanged={refresh} />}
+      {selected !== null && <BlockModal index={Number(selected)} onClose={() => setParams({})} onChanged={async () => { await load(); if (report) await verify.run(); }} />}
     </div>
   );
 }
 
 function BlockModal({ index, onClose, onChanged }: { index: number; onClose: () => void; onChanged: () => Promise<void> }) {
-  const [data, setData] = useState<BlockInspection | null>(null);
-  const [error, setError] = useState<Error | null>(null);
-  useEffect(() => {
-    setData(null); setError(null);
-    api.get<BlockInspection>(`/ledger/blocks/${index}`).then(setData).catch(setError);
-  }, [index]);
-  const tamper = useAction(async (mode: "EDIT_ONLY" | "EDIT_AND_REHASH") => { setData(await api.post<BlockInspection>(`/ledger/blocks/${index}/tamper`, { mode })); await onChanged(); });
-  const restore = useAction(async () => { setData(await api.post<BlockInspection>(`/ledger/blocks/${index}/restore`)); await onChanged(); });
-
-  const href = data ? recordHref(data.block) : null;
-  const checks = data ? [
-    ["Block hash recomputes", data.checks.blockHashValid],
-    ["Links to previous block", data.checks.previousLinkValid],
-    ["Next block links here", data.checks.nextLinkValid],
-    [`${data.block.algorithm} signature valid`, data.checks.signatureValid],
-  ] as const : [];
-
+  const [d, setD] = useState<Inspection | null>(null);
+  const [err, setErr] = useState<Error | null>(null);
+  useEffect(() => { setD(null); setErr(null); api.get<Inspection>(`/ledger/blocks/${index}`).then(setD).catch(setErr); }, [index]);
+  const tamper = useAction(async (mode: "EDIT_ONLY" | "EDIT_AND_REHASH") => { setD(await api.post<Inspection>(`/ledger/blocks/${index}/tamper`, { mode })); await onChanged(); });
+  const restore = useAction(async () => { setD(await api.post<Inspection>(`/ledger/blocks/${index}/restore`)); await onChanged(); });
+  const link = d ? href(d.block) : null;
+  const checks: [string, boolean | null][] = d ? [["Block hash recomputes", d.checks.blockHashValid], ["Links to the previous block", d.checks.previousLinkValid], ["Next block links here", d.checks.nextLinkValid], [`${d.block.algorithm} signature valid`, d.checks.signatureValid]] : [];
   return (
-    <Modal open onClose={onClose} title={<span className="font-mono">Block #{index}</span>} wide>
-      {error ? <ErrorState error={error} /> : !data ? <Loading /> : (
-        <div className="space-y-6">
-          <ul className="grid gap-x-8 gap-y-1.5 sm:grid-cols-2">
-            {checks.map(([label, ok]) => (
-              <li key={label} className={cx("flex items-center gap-2 text-[13px]", ok === null ? "text-slate-500" : ok ? "text-slate-200" : "font-semibold text-red-300")}>
-                {ok === null ? <span className="w-4 text-center">–</span> : <CheckIcon status={ok ? "pass" : "fail"} className="h-4 w-4" />}
-                {label}{ok === null && " (tip of chain)"}
-              </li>
-            ))}
+    <Modal open onClose={onClose} wide title={`Block #${index}`} subtitle={d ? `${KIND[d.block.recordType] ?? d.block.recordType} · ${d.block.action.toLowerCase()} · ${formatDateTime(d.block.timestamp)}` : undefined}>
+      {err ? <ErrorState error={err} /> : !d ? <Loading /> : (
+        <div className="flex flex-col gap-6">
+          <ul className="m-0 grid list-none gap-x-8 gap-y-2 p-0 sm:grid-cols-2">
+            {checks.map(([l, ok]) => <li key={l}><Status tone={ok === null ? "mute" : ok ? "ok" : "bad"} className="text-[14px]">{l}{ok === null ? " (tip of chain)" : ""}</Status></li>)}
           </ul>
-          <dl className="grid gap-x-8 gap-y-4 sm:grid-cols-2">
-            <KV label="Record">{href ? <Link to={href} className="font-mono text-[12px] text-brand-300 hover:underline" onClick={onClose}>{data.block.recordId}</Link> : <span className="font-mono text-[12px]">{data.block.recordId}</span>}</KV>
-            <KV label="Signer">{data.block.signer}</KV>
-            <KV label="Timestamp">{formatDateTime(data.block.timestamp)}</KV>
-            <KV label="Signature">{data.block.algorithm} · {data.signatureBytes.toLocaleString()} bytes</KV>
-            <KV label="Stored block hash"><Hash value={data.block.blockHash} full tone={data.checks.blockHashValid ? undefined : "red"} /></KV>
-            <KV label="Recomputed block hash"><Hash value={data.recomputedHash} full tone={data.checks.blockHashValid ? "green" : "red"} /></KV>
-            <KV label="Previous hash (stored)"><Hash value={data.block.previousHash} full /></KV>
-            <KV label={data.previousBlock ? `Current hash of block #${data.previousBlock.index}` : "Genesis"}><Hash value={data.previousBlock?.blockHash ?? "0".repeat(64)} full tone={data.checks.previousLinkValid ? undefined : "red"} /></KV>
-          </dl>
-          <div>
-            <div className="label mb-1.5">Canonical header (input to SHA-256)</div>
-            <pre className="max-h-36 overflow-auto whitespace-pre-wrap break-all rounded-md border border-ink-700 bg-ink-950 p-3 font-mono text-[11px] text-slate-400">{data.canonicalHeader}</pre>
+          <div className="grid gap-x-8 gap-y-4 sm:grid-cols-2">
+            <KV label="Record">{link ? <Link to={link} onClick={onClose} className="font-mono text-[13px] underline underline-offset-[3px]">{d.block.recordId}</Link> : <span className="font-mono text-[13px]">{d.block.recordId}</span>}</KV>
+            <KV label="Signer">{d.block.signer}</KV>
+            <KV label="Stored block hash"><Hash full value={d.block.blockHash} className={cx(!d.checks.blockHashValid && "text-bad")} /></KV>
+            <KV label="Recomputed block hash"><Hash full value={d.recomputedHash} className={d.checks.blockHashValid ? "text-ok" : "text-bad"} /></KV>
+            <KV label="Previous hash (stored)"><Hash full value={d.block.previousHash} /></KV>
+            <KV label={d.previousBlock ? `Current hash of block #${d.previousBlock.index}` : "Genesis"}><Hash full value={d.previousBlock?.blockHash ?? "0".repeat(64)} className={cx(!d.checks.previousLinkValid && "text-bad")} /></KV>
           </div>
+          <KV label="Signature">{d.block.algorithm} · {d.signatureBytes.toLocaleString()} bytes</KV>
+          <div><div className="eyebrow mb-1.5 text-faint">Canonical header (input to SHA-256)</div><pre className="m-0 max-h-32 overflow-auto whitespace-pre-wrap break-all rounded border border-line bg-paper p-3 font-mono text-[11.5px] text-mute">{d.canonicalHeader}</pre></div>
           {index > 0 && (
-            <div className="border-t border-ink-700 pt-5">
-              <div className="mb-1 flex items-center gap-2 text-[14px] font-semibold text-slate-100"><FlaskConical className="h-4 w-4 text-red-400" /> Ledger tampering simulation</div>
-              <p className="mb-3 text-[13px] text-slate-400">Demonstration only. Overwrites this block's data hash directly in the database, as an insider bypassing the append-only API might.</p>
+            <div className="flex flex-col gap-3 border-t border-line-2 pt-5">
+              <div><div className="text-[15px] font-semibold">Ledger tampering simulation</div><p className="m-0 mt-1 text-[13px] text-mute">Demonstration only. Overwrites this block's data hash directly in the database, as an insider bypassing the append-only API might.</p></div>
               <InlineError error={tamper.error ?? restore.error} />
-              <div className="mt-2 flex flex-wrap gap-2">
-                {data.block.demoTampered ? (
-                  <Button variant="secondary" onClick={() => restore.run()} loading={restore.pending} icon={<RotateCcw className="h-4 w-4" />}>Restore original block</Button>
-                ) : (
-                  <>
-                    <Button variant="danger" size="sm" onClick={() => tamper.run("EDIT_ONLY")} loading={tamper.pending}>Edit block (leave hash stale)</Button>
-                    <Button variant="danger" size="sm" onClick={() => tamper.run("EDIT_AND_REHASH")} loading={tamper.pending}>Edit block and recompute its hash</Button>
-                  </>
-                )}
+              <div className="flex flex-wrap gap-2">
+                {d.block.demoTampered ? <Btn variant="outline" loading={restore.pending} onClick={() => restore.run()}>Restore original block</Btn> : (<>
+                  <Btn variant="danger" size="sm" loading={tamper.pending} onClick={() => tamper.run("EDIT_ONLY")}>Edit block (leave hash stale)</Btn>
+                  <Btn variant="danger" size="sm" loading={tamper.pending} onClick={() => tamper.run("EDIT_AND_REHASH")}>Edit block and recompute its hash</Btn></>)}
               </div>
             </div>
           )}
