@@ -34,7 +34,8 @@ export const SIGNERS: SignerIdentity[] = [
   { id: "warehouse", name: "Warehouse Supervisor", role: "WAREHOUSE", organization: "Coastal Bonded Warehousing (fictional)", algorithm: "ML-DSA-65" },
   { id: "logistics", name: "Logistics Operator", role: "TRANSPORT", organization: "Deccan Cold-Chain Logistics (fictional)", algorithm: "ML-DSA-65" },
   { id: "distributor", name: "Distributor", role: "DISTRIBUTOR", organization: "Southern Medical Distributors (fictional)", algorithm: "ML-DSA-65" },
-  { id: "retailer", name: "Retail Pharmacist", role: "RETAILER", organization: "CityCare Pharmacy (fictional)", algorithm: "ML-DSA-65" },
+  { id: "retailer", name: "Retail Pharmacist", role: "RETAILER", organization: "Licensed dispensing pharmacy (fictional)", algorithm: "ML-DSA-65" },
+  { id: "centurion-univ", name: "Registrar / Controller of Examinations", role: "CERTIFICATE_AUTHORITY", organization: "Centurion University of Technology and Management (CUTM), Vizianagaram", algorithm: "ML-DSA-65" },
   { id: "ledger-node", name: "Ledger Node", role: "LEDGER", organization: "QuantumShield permissioned ledger", algorithm: "ML-DSA-65" },
   { id: "legacy-ca", name: "Legacy Registry CA (2019)", role: "LEGACY_SIGNER", organization: "Pre-migration digitisation system (fictional)", algorithm: "ECDSA-P256-SHA256" },
 ];

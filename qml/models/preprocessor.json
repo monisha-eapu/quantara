@@ -1,0 +1,20 @@
+{
+  "features": [
+    "transaction_frequency",
+    "transaction_velocity",
+    "ownership_change_frequency",
+    "geographical_distance"
+  ],
+  "data_min": [
+    0.1,
+    0.01,
+    0.0,
+    0.5
+  ],
+  "data_max": [
+    14.159600673174127,
+    1.0,
+    8.0,
+    474.3941958130507
+  ]
+}

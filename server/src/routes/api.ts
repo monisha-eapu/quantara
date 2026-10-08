@@ -9,6 +9,7 @@ import { inspectBlock, listBlocks, restoreBlock, tamperBlock, verifyChain } from
 import { compareSchemes, migrateRecord, migrationOverview } from "../services/migration.js";
 import { getRecordDetail, getRecordRow, listRecords, restoreRecord, tamperRecord, verifyRecord } from "../services/records.js";
 import { addEvent, createProduct, getProduct, listProducts, restoreEvent, tamperEvent, verifyProduct } from "../services/supplyChain.js";
+import { listCertificates, issueCertificate, getCertificate } from "../services/certificates.js";
 import { clearDemoData, seedDemoData, DEMO_RECORD_ID } from "../seed.js";
 import { notFound } from "../services/errors.js";
 
@@ -94,6 +95,16 @@ api.post("/supply-chain/products/:id/verify", h((req) => verifyProduct(param(req
 const eventTamperSchema = z.object({ field: z.string().min(1), value: z.string().trim().min(1).max(200) });
 api.post("/supply-chain/events/:id/tamper", h((req) => tamperEvent(param(req, "id"), eventTamperSchema.parse(req.body))));
 api.post("/supply-chain/events/:id/restore", h((req) => restoreEvent(param(req, "id"))));
+
+// ---- Certificates ------------------------------------------------------------
+api.get("/certificates", h(() => ({ certificates: listCertificates() })));
+api.post("/certificates", h((req, res) => {
+  const out = issueCertificate(req.body);
+  res.status(201);
+  return out;
+}));
+api.get("/certificates/:id", h((req) => getCertificate(param(req, "id"))));
+api.post("/certificates/:id/verify", h((req) => verifyRecord(param(req, "id"), "Verifier")));
 
 // ---- Audit, crypto, migration, integrity ----------------------------------------
 api.get("/audit", h((req) => listAudit({ limit: num(req.query.limit), offset: num(req.query.offset), action: str(req.query.action), result: str(req.query.result), q: str(req.query.q) })));

@@ -5,16 +5,17 @@
   "description": "QuantumShield — Post-Quantum Trust for Critical Digital Records (hackathon prototype)",
   "workspaces": ["server", "web"],
   "scripts": {
-    "setup": "bash scripts/setup.sh",
+    "setup": "node scripts/setup.js",
     "dev": "concurrently -k -n server,web,quantum -c blue,cyan,magenta \"npm:dev:server\" \"npm:dev:web\" \"npm:dev:quantum\"",
     "dev:server": "npm run dev -w server",
     "dev:web": "npm run dev -w web",
-    "dev:quantum": "bash scripts/quantum.sh",
-    "qml": "bash qml",
+    "dev:quantum": "node scripts/quantum.js",
+    "demo": "python demo.py",
+    "qml": "node scripts/qml.js",
     "build": "npm run build -w server && npm run build -w web",
     "start": "concurrently -k -n server,quantum -c blue,magenta \"npm run start -w server\" \"npm:dev:quantum\"",
     "seed": "npm run seed -w server",
-    "test": "npm run test -w server && cd quantum-service && .venv/bin/python -m unittest discover -s tests -v",
+    "test": "npm run test -w server && node scripts/test-quantum.js",
     "typecheck": "npm run typecheck -w server && npm run typecheck -w web"
   },
   "devDependencies": {
