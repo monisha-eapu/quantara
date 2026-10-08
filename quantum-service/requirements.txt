@@ -1,0 +1,7 @@
+qiskit==2.2.3
+qiskit-ibm-runtime==0.43.1
+qiskit-aer==0.17.2
+fastapi==0.128.8
+uvicorn[standard]==0.39.0
+python-dotenv==1.2.1
+scikit-learn>=1.5
