@@ -27,6 +27,21 @@ if hasattr(sys.stdout, 'reconfigure'):
     except Exception:
         pass
 
+# Ensure project root is in sys.path
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+# Auto-redirect to virtual environment if packages are missing
+try:
+    import sklearn
+    import qiskit
+except ImportError:
+    venv_py = ROOT / "quantum-service" / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    if venv_py.exists() and Path(sys.executable).resolve() != venv_py.resolve():
+        import subprocess
+        sys.exit(subprocess.call([str(venv_py)] + sys.argv))
+
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
@@ -35,10 +50,18 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 
-from .config import DATASET_PATH, MODELS_DIR, BENCHMARK_PATH, RANDOM_SEED, NUM_QUBITS, SELECTED_FEATURES
-from .preprocessing import QLIEPreprocessor
-from .quantum_kernel import QuantumKernelEvaluator
-from .circuit_visualizer import get_circuit_details
+try:
+    from .config import DATASET_PATH, MODELS_DIR, BENCHMARK_PATH, RANDOM_SEED, NUM_QUBITS, SELECTED_FEATURES
+    from .preprocessing import QLIEPreprocessor
+    from .quantum_kernel import QuantumKernelEvaluator
+    from .circuit_visualizer import get_circuit_details
+    from .feature_map import transpile_feature_map_level4
+except (ImportError, ValueError):
+    from qml.config import DATASET_PATH, MODELS_DIR, BENCHMARK_PATH, RANDOM_SEED, NUM_QUBITS, SELECTED_FEATURES
+    from qml.preprocessing import QLIEPreprocessor
+    from qml.quantum_kernel import QuantumKernelEvaluator
+    from qml.circuit_visualizer import get_circuit_details
+    from qml.feature_map import transpile_feature_map_level4
 
 
 def run_training_and_benchmark(train_size: int = 600, test_size: int = 200, seed: int = RANDOM_SEED) -> dict:
@@ -172,7 +195,6 @@ def run_training_and_benchmark(train_size: int = 600, test_size: int = 200, seed
     rf_m = metrics(rf_preds, rf_scores)
     mlp_m = metrics(mlp_preds, mlp_scores)
 
-    from .feature_map import transpile_feature_map_level4
     circuit_meta = get_circuit_details(num_qubits=NUM_QUBITS, reps=2)
     hw_info = transpile_feature_map_level4(num_qubits=NUM_QUBITS, reps=2)
 
