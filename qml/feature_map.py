@@ -10,9 +10,24 @@ Constructs high-expressibility, hardware-efficient quantum circuits featuring:
 from __future__ import annotations
 
 import math
+import os
+import sys
 import time
+from pathlib import Path
 from typing import Dict, Any, List, Optional
 import numpy as np
+
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+try:
+    import qiskit
+except ImportError:
+    venv_py = ROOT / "quantum-service" / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    if venv_py.exists() and Path(sys.executable).resolve() != venv_py.resolve():
+        import subprocess
+        sys.exit(subprocess.call([str(venv_py)] + sys.argv))
 
 from qiskit import QuantumCircuit, transpile
 from qiskit.quantum_info import Operator
@@ -218,3 +233,14 @@ def hardware_compile_report(num_qubits: int = 4, reps: int = 2, backend_name: st
         "unitary_equivalent": equivalent,
         "ascii": str(best.draw(output="text", idle_wires=False, fold=110)),
     }
+
+
+if __name__ == "__main__":
+    print("Compiling Level-4 feature map onto simulated IBM Torino (133-qubit heavy-hex)...")
+    rep = hardware_compile_report(num_qubits=4, reps=2, backend_name="torino", seeds=8)
+    print(f"Backend: {rep['backend']} ({rep['backend_qubits']} qubits)")
+    print(f"Source depth: {rep['source']['depth']}, 2Q gates: {rep['source']['two_qubit_gates']}")
+    print(f"L4 Best compiled: Depth {rep['best']['depth']}, 2Q CZ gates: {rep['best']['two_qubit_gates']}")
+    print(f"Unitary equivalence: {rep['unitary_equivalent']}")
+    print(f"Estimated success: {rep['best']['estimated_success_probability']*100:.1f}%")
+
