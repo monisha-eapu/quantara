@@ -4,7 +4,7 @@
   "train_samples": 600,
   "test_samples": 200,
   "anomaly_ratio": 0.5,
-  "timestamp": "2026-10-08 18:10:55 UTC",
+  "timestamp": "2026-10-09 08:34:33 UTC",
   "quantum_programming_tier": "QISKIT_LEVEL_4_DISTINGUISHED",
   "quantum_advantage_metrics": {
     "kernel_target_alignment_quantum": 0.4369,
@@ -30,8 +30,8 @@
     "recall": 1.0,
     "f1_score": 1.0,
     "roc_auc": 1.0,
-    "training_time_sec": 0.302,
-    "inference_time_ms": 0.5
+    "training_time_sec": 0.339,
+    "inference_time_ms": 0.51
   },
   "classical_svm": {
     "model_name": "Classical SVM (RBF Kernel)",
@@ -41,7 +41,7 @@
     "recall": 1.0,
     "f1_score": 1.0,
     "roc_auc": 1.0,
-    "training_time_sec": 0.0055,
+    "training_time_sec": 0.0013,
     "inference_time_ms": 0.0
   },
   "classical_random_forest": {
@@ -51,8 +51,8 @@
     "recall": 1.0,
     "f1_score": 1.0,
     "roc_auc": 1.0,
-    "training_time_sec": 0.0329,
-    "inference_time_ms": 0.01
+    "training_time_sec": 0.033,
+    "inference_time_ms": 0.02
   },
   "classical_mlp": {
     "model_name": "Classical Multi-Layer Perceptron (32x16)",
@@ -61,7 +61,7 @@
     "recall": 1.0,
     "f1_score": 1.0,
     "roc_auc": 1.0,
-    "training_time_sec": 0.0477,
+    "training_time_sec": 0.048,
     "inference_time_ms": 0.0
   },
   "scientific_conclusion": "Empirical results over 10,000 Andhra Pradesh transactions demonstrate that QLIE's 4-qubit ZZFeatureMap Hilbert space embedding reliably catches subtle multi-variable insider churn fraud (100% Recall). Formal kernel-target alignment and geometric difference bounds prove that the quantum kernel captures non-linear geometric manifolds inaccessible to polynomial classical hyperplanes."
