@@ -102,30 +102,44 @@ def generate_dataset(num_samples: int = 10000, anomaly_ratio: float = 0.16, seed
     # --------------------------------------------------------------------------
     # 1. Normal (Legitimate) Transactions (84% of population)
     # --------------------------------------------------------------------------
-    tx_freq_norm = rng.normal(loc=1.6, scale=0.6, size=num_normal).clip(0.1, 4.2)
-    tx_vel_norm = rng.beta(a=2.0, b=8.0, size=num_normal).clip(0.01, 0.38)
+    tx_freq_norm = rng.normal(loc=1.8, scale=0.8, size=num_normal).clip(0.1, 5.8)
+    tx_vel_norm = rng.beta(a=2.0, b=6.0, size=num_normal).clip(0.01, 0.48)
     tx_val_norm = rng.lognormal(mean=2.8, sigma=0.7, size=num_normal).clip(1.5, 65.0) # 1.5 to 65 Lakhs INR
-    own_freq_norm = rng.poisson(lam=0.35, size=num_normal).clip(0, 2)
+    own_freq_norm = rng.poisson(lam=0.4, size=num_normal).clip(0, 3)
     hist_owners_norm = rng.poisson(lam=2.0, size=num_normal).clip(1, 5)
     time_prev_norm = rng.exponential(scale=240.0, size=num_normal).clip(15.0, 1825.0) # Up to 5 years
-    geo_dist_norm = rng.exponential(scale=12.0, size=num_normal).clip(0.2, 55.0)
-    time_dev_norm = rng.normal(loc=1.1, scale=0.7, size=num_normal).clip(0.05, 3.8)
+    geo_dist_norm = rng.exponential(scale=14.0, size=num_normal).clip(0.2, 70.0)
+    time_dev_norm = rng.normal(loc=1.1, scale=0.7, size=num_normal).clip(0.05, 4.5)
     acreage_norm = rng.gamma(shape=2.5, scale=1.5, size=num_normal).clip(0.5, 18.0)
     encumbrance_norm = rng.beta(a=1.5, b=9.0, size=num_normal).clip(0.0, 0.35)
+
+    # Inject 8% legitimate active commercial / consolidation transfers (boundary cases)
+    n_active = int(num_normal * 0.08)
+    tx_freq_norm[:n_active] = rng.normal(loc=3.8, scale=0.8, size=n_active).clip(2.0, 5.8)
+    tx_vel_norm[:n_active] = rng.beta(a=3.5, b=4.5, size=n_active).clip(0.28, 0.52)
+    own_freq_norm[:n_active] = rng.poisson(lam=1.1, size=n_active).clip(0, 3)
+    geo_dist_norm[:n_active] = rng.normal(loc=35.0, scale=12.0, size=n_active).clip(5.0, 75.0)
 
     # --------------------------------------------------------------------------
     # 2. Anomalous (Fraudulent / Suspicious) Transactions (16% of population)
     # --------------------------------------------------------------------------
-    tx_freq_anom = rng.normal(loc=9.2, scale=2.8, size=num_anomalies).clip(4.5, 24.0)
-    tx_vel_anom = rng.beta(a=7.0, b=2.5, size=num_anomalies).clip(0.52, 1.0)
+    tx_freq_anom = rng.normal(loc=8.8, scale=2.6, size=num_anomalies).clip(3.5, 22.0)
+    tx_vel_anom = rng.beta(a=6.5, b=2.2, size=num_anomalies).clip(0.45, 1.0)
     tx_val_anom = rng.lognormal(mean=4.5, sigma=1.0, size=num_anomalies).clip(15.0, 350.0)
-    own_freq_anom = rng.poisson(lam=4.8, size=num_anomalies).clip(3, 10)
-    hist_owners_anom = rng.poisson(lam=7.5, size=num_anomalies).clip(4, 15)
-    time_prev_anom = rng.exponential(scale=3.2, size=num_anomalies).clip(0.05, 12.0)
-    geo_dist_anom = rng.normal(loc=310.0, scale=80.0, size=num_anomalies).clip(110.0, 850.0)
+    own_freq_anom = rng.poisson(lam=4.2, size=num_anomalies).clip(2, 10)
+    hist_owners_anom = rng.poisson(lam=7.0, size=num_anomalies).clip(3, 15)
+    time_prev_anom = rng.exponential(scale=4.5, size=num_anomalies).clip(0.05, 18.0)
+    geo_dist_anom = rng.normal(loc=260.0, scale=70.0, size=num_anomalies).clip(75.0, 750.0)
     time_dev_anom = rng.normal(loc=115.0, scale=45.0, size=num_anomalies).clip(25.0, 420.0)
     acreage_anom = rng.gamma(shape=6.0, scale=4.0, size=num_anomalies).clip(2.0, 95.0)
-    encumbrance_anom = rng.beta(a=6.0, b=2.0, size=num_anomalies).clip(0.55, 1.0)
+    encumbrance_anom = rng.beta(a=6.0, b=2.0, size=num_anomalies).clip(0.45, 1.0)
+
+    # Inject 15% stealth insider churn (designed to mimic velocity near the threshold)
+    n_stealth = int(num_anomalies * 0.15)
+    tx_freq_anom[:n_stealth] = rng.normal(loc=3.8, scale=0.8, size=n_stealth).clip(2.2, 5.5)
+    tx_vel_anom[:n_stealth] = rng.beta(a=3.5, b=4.2, size=n_stealth).clip(0.28, 0.54)
+    own_freq_anom[:n_stealth] = rng.poisson(lam=3.2, size=n_stealth).clip(2, 6)
+    geo_dist_anom[:n_stealth] = rng.normal(loc=160.0, scale=35.0, size=n_stealth).clip(70.0, 260.0)
 
     # --------------------------------------------------------------------------
     # Combine quantitative matrices
