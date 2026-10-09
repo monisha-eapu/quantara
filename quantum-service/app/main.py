@@ -158,6 +158,25 @@ def get_qml_circuit(qubits: int = 4, reps: int = 2) -> dict:
     return get_circuit_details(num_qubits=qubits, reps=reps)
 
 
+_compile_cache: dict = {}
+
+
+@app.get("/qml/compile")
+def get_qml_compile(backend: str = "torino", seeds: int = 16, fresh: bool = False) -> dict:
+    """Hardware-aware compile report (device-model routing, O0-O3 sweep, L4 routing search)."""
+    from qml.feature_map import hardware_compile_report, _BACKENDS
+    if backend not in _BACKENDS:
+        raise HTTPException(400, f"Unknown backend '{backend}'. Choose one of: {', '.join(_BACKENDS)}.")
+    seeds = max(1, min(seeds, 64))
+    key = (backend, seeds)
+    if fresh or key not in _compile_cache:
+        try:
+            _compile_cache[key] = hardware_compile_report(backend_name=backend, seeds=seeds)
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(500, f"Compile report failed: {e}")
+    return _compile_cache[key]
+
+
 @app.get("/qml/benchmark")
 def get_qml_benchmark() -> dict:
     if not BENCHMARK_PATH.exists():
@@ -254,5 +273,38 @@ def security_analyze(req: SecurityAnalyzeRequest) -> dict:
         "decision": decision,
         "action_summary": action_summary,
         "timestamp": _time.strftime("%Y-%m-%d %H:%M:%S UTC", _time.gmtime()),
+    }
+
+
+# ============================================================================
+# QKD (Quantum Key Distribution) Decoy-State BB84 Channel Simulation
+# ============================================================================
+class QkdSimulateRequest(BaseModel):
+    n_photons: int = Field(default=128, ge=32, le=512)
+    eavesdropper: bool = False
+    decoy_intensity: str = "mu_0.50"
+    seed: Optional[int] = None
+
+
+@app.post("/qkd/simulate")
+def qkd_simulate(req: QkdSimulateRequest) -> dict:
+    from .qml import run_bb84, QBER_ABORT
+    res = run_bb84(n_qubits=req.n_photons, eavesdropper=req.eavesdropper, seed=req.seed)
+    return {
+        "n_photons_transmitted": res.n_qubits,
+        "sifted_bits": res.sifted,
+        "sample_bits_tested": res.sampled,
+        "qber_percent": round(res.qber * 100, 2),
+        "qber_threshold_percent": round(QBER_ABORT * 100, 2),
+        "eavesdropper_active": res.eavesdropper,
+        "channel_aborted": res.aborted,
+        "status": "UNCONDITIONAL_ABORT_EAVESDROPPER_DETECTED" if res.aborted else "SECURE_QUANTUM_KEY_AGREED",
+        "key_bits_amplified": res.key_bits_before_amplification if not res.aborted else 0,
+        "key_hex": res.key.hex() if res.key else None,
+        "backend": res.backend,
+        "physics_defense": (
+            "Heisenberg Uncertainty & No-Cloning Theorem guarantee that measurement in non-orthogonal conjugate bases "
+            "unavoidably introduces detectable error disturbance (QBER >= 25%)."
+        ),
     }
 

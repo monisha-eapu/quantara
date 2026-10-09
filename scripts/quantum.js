@@ -24,7 +24,7 @@ const port = process.env.QUANTUM_PORT || '8001';
 
 const child = spawn(
   venvPython,
-  ['-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', port],
+  ['-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', port, '--reload'],
   {
     cwd: path.join(rootDir, 'quantum-service'),
     stdio: 'inherit',

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import type { IntegrityStatus } from "../lib/api";
+import type { CheckStatus, IntegrityStatus } from "../lib/api";
 import { shortHash } from "../lib/format";
 
 export function cx(...c: (string | false | null | undefined)[]) {
@@ -96,14 +96,14 @@ export function Banner({ tone, title, children }: { tone: "ok" | "bad" | "warn";
   );
 }
 
-export function Hash({ value, n = 6, full, className }: { value: string | null | undefined; n?: number; full?: boolean; className?: string }) {
+export function Hash({ value, n = 6, full, className, tone }: { value: string | null | undefined; n?: number; full?: boolean; className?: string; tone?: "red" | "green" }) {
   const [copied, setCopied] = useState(false);
   if (!value) return <span className="font-mono text-[12px] text-faint">—</span>;
   const copy = async () => {
     try { await navigator.clipboard.writeText(value); setCopied(true); setTimeout(() => setCopied(false), 1200); } catch { /* clipboard unavailable */ }
   };
   return (
-    <button type="button" onClick={copy} title={copied ? "Copied" : "Click to copy"} className={cx("max-w-full cursor-pointer border-0 bg-transparent p-0 text-left font-mono text-[12.5px]", full ? "break-all" : "truncate", className)}>
+    <button type="button" onClick={copy} title={copied ? "Copied" : "Click to copy"} className={cx("max-w-full cursor-pointer border-0 bg-transparent p-0 text-left font-mono text-[12.5px]", tone === "red" && "text-bad", tone === "green" && "text-ok", full ? "break-all" : "truncate", className)}>
       {full ? value : shortHash(value, n)}{copied && <span className="ml-2 text-ok">copied</span>}
     </button>
   );
@@ -127,9 +127,10 @@ export function InlineError({ error }: { error: Error | null }) {
   return <div role="alert" className="border-l-[3px] border-bad bg-bad-bg px-4 py-2.5 text-[13px] text-bad">{error.message}</div>;
 }
 
-export function Empty({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
+export function Empty({ title, description, action, icon }: { title: string; description?: string; action?: ReactNode; icon?: ReactNode }) {
   return (
     <div className="flex flex-col items-center gap-2 rounded border border-dashed border-line-4 px-6 py-[72px] text-center">
+      {icon && <div className="mb-1 text-faint">{icon}</div>}
       <span className="text-[16px] font-medium">{title}</span>
       {description && <span className="max-w-[520px] text-[14px] leading-relaxed text-mute">{description}</span>}
       {action && <div className="mt-2">{action}</div>}
@@ -137,7 +138,7 @@ export function Empty({ title, description, action }: { title: string; descripti
   );
 }
 
-export function Modal({ open, onClose, title, subtitle, children, footer, wide }: { open: boolean; onClose: () => void; title: ReactNode; subtitle?: ReactNode; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
+export function Modal({ open, onClose, title, subtitle, children, footer, wide, tone }: { tone?: "red" | "violet"; open: boolean; onClose: () => void; title: ReactNode; subtitle?: ReactNode; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -147,7 +148,7 @@ export function Modal({ open, onClose, title, subtitle, children, footer, wide }
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/40 p-6" onMouseDown={onClose}>
-      <div role="dialog" aria-modal="true" onMouseDown={(e) => e.stopPropagation()} className={cx("my-auto flex w-full flex-col rounded bg-card shadow-[0_30px_60px_-20px_rgba(25,25,23,0.4)]", wide ? "max-w-[860px]" : "max-w-[520px]")}>
+      <div role="dialog" aria-modal="true" onMouseDown={(e) => e.stopPropagation()} className={cx("my-auto flex w-full flex-col rounded bg-card shadow-[0_30px_60px_-20px_rgba(25,25,23,0.4)]", wide ? "max-w-[860px]" : "max-w-[520px]", tone === "red" && "border-l-[3px] border-bad", tone === "violet" && "border-l-[3px] border-ink")}>
         <div className="flex flex-col gap-1 border-b border-line-2 px-[26px] py-[22px]">
           <span className="font-serif text-[26px] leading-tight">{title}</span>
           {subtitle && <span className="text-[13px] text-mute">{subtitle}</span>}
@@ -159,18 +160,18 @@ export function Modal({ open, onClose, title, subtitle, children, footer, wide }
   );
 }
 
-export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
+export function Field({ label, children, hint, error }: { label: string; children: ReactNode; hint?: string; error?: string }) {
   return (
     <label className="flex flex-col gap-1.5 text-[13px] font-medium">
       {label}
       {children}
-      {hint && <span className="text-[12px] font-normal text-mute">{hint}</span>}
+      {error ? <span className="text-[12px] font-normal text-bad">{error}</span> : hint ? <span className="text-[12px] font-normal text-mute">{hint}</span> : null}
     </label>
   );
 }
 
-export function KV({ label, children }: { label: string; children: ReactNode }) {
-  return <div className="flex min-w-0 flex-col gap-1"><span className="eyebrow text-faint">{label}</span><div className="min-w-0 text-[14px]">{children}</div></div>;
+export function KV({ label, children, mono }: { label: string; children: ReactNode; mono?: boolean }) {
+  return <div className="flex min-w-0 flex-col gap-1"><span className="eyebrow text-faint">{label}</span><div className={cx("min-w-0 text-[14px]", mono && "font-mono text-[12px]")}>{children}</div></div>;
 }
 
 export function BackLink({ onClick, children }: { onClick: () => void; children: ReactNode }) {
@@ -193,5 +194,95 @@ export function StepList({ steps }: { steps: Step[] }) {
         </li>
       ))}
     </ol>
+  );
+}
+
+/* ---- Components used by the Certificates, Live Demo and Quantum Lab pages, in the same paper/ink style ---- */
+
+const pillTone: Record<string, string> = {
+  slate: "border-line bg-hov text-body",
+  blue: "border-line-4 bg-card text-ink",
+  green: "border-ok/40 bg-ok-bg text-ok",
+  red: "border-bad-line bg-bad-bg text-bad",
+  amber: "border-warn-line bg-warn-bg text-warn",
+  violet: "border-ink bg-card text-ink",
+  cyan: "border-line-4 bg-card text-ink",
+};
+export function Pill({ children, tone = "slate", className }: { children: ReactNode; tone?: string; className?: string }) {
+  return <span className={cx("inline-flex items-center gap-1 whitespace-nowrap rounded-[3px] border px-2 py-0.5 text-[11px] font-medium", pillTone[tone] || pillTone.slate, className)}>{children}</span>;
+}
+
+export function StatusBadge({ status, className }: { status: IntegrityStatus | string; className?: string }) {
+  const s = integrityTone[status as IntegrityStatus] ?? integrityTone.UNVERIFIED;
+  return <Status tone={s.tone} className={className}>{s.label}</Status>;
+}
+
+export function CheckIcon({ status, className = "h-5 w-5" }: { status: CheckStatus; className?: string }) {
+  const tone = status === "pass" ? "text-ok" : status === "warn" ? "text-warn" : "text-bad";
+  const d = status === "pass" ? "M5 12.5l4.5 4.5L19 7.5" : status === "warn" ? "M12 8v5M12 16.5v.01" : "M6 6l12 12M18 6L6 18";
+  return <svg className={cx(className, tone)} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-label={status}><path d={d} /></svg>;
+}
+
+export function Spinner({ className = "h-4 w-4" }: { className?: string }) {
+  return <span role="presentation" className={cx("inline-block animate-spin rounded-full border-2 border-line-4 border-t-ink", className)} />;
+}
+
+type ButtonVariant = "primary" | "secondary" | "danger" | "ghost" | "success" | "quantum" | "outline" | "light";
+const buttonMap: Record<ButtonVariant, BtnVariant> = { primary: "primary", quantum: "primary", success: "primary", secondary: "outline", outline: "outline", ghost: "ghost", danger: "danger", light: "light" };
+export function Button({ variant = "secondary", loading, icon, children, className, size = "md", ...rest }: Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "className"> & {
+  variant?: ButtonVariant; loading?: boolean; icon?: ReactNode; size?: "sm" | "md" | "lg"; className?: string;
+}) {
+  const sizes = { sm: "px-3.5 py-2 text-[13px]", md: "px-[18px] py-[11px] text-[14px]", lg: "px-[22px] py-[14px] text-[15px]" };
+  return (
+    <button {...rest} disabled={rest.disabled || loading} className={cx("inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded font-medium transition-colors", sizes[size], btnVariant[buttonMap[variant]], className)}>
+      {loading ? <Spinner className="h-3.5 w-3.5" /> : icon}
+      {children}
+    </button>
+  );
+}
+
+export function PageHeader({ eyebrow, title, description, actions }: { eyebrow?: string; title: ReactNode; description?: ReactNode; actions?: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-5">
+      <div className="flex max-w-[760px] flex-col gap-1.5">
+        {eyebrow && <span className="eyebrow">{eyebrow}</span>}
+        <h1 className="m-0 font-serif text-[40px] font-normal leading-[1.1] tracking-[-0.02em]">{title}</h1>
+        {description && <p className="m-0 text-[15px] leading-relaxed text-mute">{description}</p>}
+      </div>
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+    </div>
+  );
+}
+
+export function Card({ title, subtitle, actions, children, className, bodyClass, icon }: {
+  title?: ReactNode; subtitle?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; bodyClass?: string; icon?: ReactNode;
+}) {
+  return (
+    <section className={cx("rounded border border-line bg-card", className)}>
+      {(title || actions) && (
+        <header className="flex flex-wrap items-start justify-between gap-3 border-b border-line-2 px-5 py-4">
+          <div className="flex items-start gap-3">
+            {icon && <div className="mt-0.5 text-mute">{icon}</div>}
+            <div className="flex flex-col gap-0.5">
+              {title && <h2 className="m-0 text-[15px] font-semibold">{title}</h2>}
+              {subtitle && <p className="m-0 text-[13px] text-mute">{subtitle}</p>}
+            </div>
+          </div>
+          {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+        </header>
+      )}
+      <div className={cx("p-5", bodyClass)}>{children}</div>
+    </section>
+  );
+}
+
+export function Stat({ label, value, sub, tone = "blue", icon }: { label: string; value: ReactNode; sub?: ReactNode; tone?: "blue" | "green" | "red" | "slate" | "amber"; icon?: ReactNode }) {
+  const c = { blue: "text-ink", green: "text-ok", red: "text-bad", slate: "text-ink", amber: "text-warn" }[tone];
+  return (
+    <div className={cx("flex flex-col gap-1 rounded border border-line bg-card p-5", tone === "red" && "bg-bad-bg")}>
+      <div className="flex items-start justify-between"><span className="eyebrow">{label}</span><span className="text-mute">{icon}</span></div>
+      <span className={cx("mt-2 font-serif text-[38px] leading-none tabular-nums", c)}>{value}</span>
+      {sub && <span className="mt-1 text-[13px] text-mute">{sub}</span>}
+    </div>
   );
 }

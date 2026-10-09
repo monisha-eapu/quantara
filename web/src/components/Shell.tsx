@@ -16,12 +16,14 @@ const NAV: { group: string | null; items: { to: string; label: string; icon: str
   { group: "REGISTRY", items: [
     { to: "/app/land", label: "Land Records", icon: "M3 21h18M5 21V10M9.5 21V10M14.5 21V10M19 21V10M2 10l10-6 10 6z" },
     { to: "/app/supply-chain", label: "Supply Chain", icon: "M21 8l-9-5-9 5 9 5 9-5zM3 8v8l9 5 9-5V8M12 13v8" },
+    { to: "/app/certificates", label: "Certificates", icon: "M12 15a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM8.5 14l-1.5 7 5-3 5 3-1.5-7" },
   ] },
   { group: "INTEGRITY", items: [
     { to: "/app/verify", label: "Verification", icon: "M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5M9 14l2 2 4-4" },
     { to: "/app/ledger", label: "Ledger", icon: "M9 7H7a5 5 0 0 0 0 10h2M15 7h2a5 5 0 0 1 0 10h-2M8 12h8" },
     { to: "/app/post-quantum", label: "Post-Quantum", icon: "M12 2l8 3v6c0 5-3.5 9.5-8 11-4.5-1.5-8-6-8-11V5zM9 12h6M12 9v6" },
     { to: "/app/quantum", label: "Quantum Lab", icon: "M9 3h6M10 3v6L4.5 19a1.5 1.5 0 0 0 1.3 2h12.4a1.5 1.5 0 0 0 1.3-2L14 9V3M7 15h10" },
+    { to: "/app/demo", label: "Live Demo", icon: "M6 4l14 8-14 8z" },
     { to: "/app/audit", label: "Audit Trail", icon: "M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" },
     { to: "/app/settings", label: "Settings", icon: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6a7 7 0 0 0 0 2.4l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z" },
   ] },
@@ -29,7 +31,7 @@ const NAV: { group: string | null; items: { to: string; label: string; icon: str
 
 const TITLES: [string, string][] = [
   ["/app/land", "Land Records"], ["/app/records", "Land Records"], ["/app/supply-chain", "Supply Chain"], ["/app/verify", "Verification"], ["/app/ledger", "Ledger"],
-  ["/app/post-quantum", "Post-Quantum"], ["/app/quantum", "Quantum Lab"], ["/app/audit", "Audit Trail"], ["/app/settings", "Settings"],
+  ["/app/post-quantum", "Post-Quantum"], ["/app/quantum", "Quantum Lab"], ["/app/certificates", "Certificates"], ["/app/demo", "Live Demo"], ["/app/audit", "Audit Trail"], ["/app/settings", "Settings"],
 ];
 
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {

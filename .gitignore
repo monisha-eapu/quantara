@@ -8,3 +8,4 @@ quantum-service/data/
 __pycache__/
 *.pyc
 .DS_Store
+*.tsbuildinfo

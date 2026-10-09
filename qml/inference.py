@@ -41,7 +41,7 @@ def load_inference_engine():
     q_eval = QuantumKernelEvaluator(
         num_qubits=bundle.get("num_qubits", NUM_QUBITS),
         reps=bundle.get("reps", 2),
-        scale=bundle.get("scale", 0.45)
+        scale=bundle.get("scale", 0.25)
     )
 
     _MODEL_CACHE = {

@@ -79,67 +79,67 @@ export default function Certificates() {
 
       {/* Overview Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="p-4 bg-slate-900/60 border-slate-800">
-          <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Credentials</div>
-          <div className="mt-2 text-2xl font-bold text-white">{certs.length}</div>
-          <div className="mt-1 text-xs text-slate-500">ML-DSA-65 signed & anchored</div>
+        <Card className="p-4 bg-paper border-line-2">
+          <div className="text-xs font-semibold uppercase tracking-wider text-mute">Total Credentials</div>
+          <div className="mt-2 text-2xl font-bold text-ink">{certs.length}</div>
+          <div className="mt-1 text-xs text-faint">ML-DSA-65 signed & anchored</div>
         </Card>
-        <Card className="p-4 bg-slate-900/60 border-slate-800">
-          <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">Issuing Authority</div>
-          <div className="mt-2 text-lg font-bold text-white truncate">Centurion University / AP Govt</div>
-          <div className="mt-1 text-xs text-slate-500">Vizianagaram Campus CA</div>
+        <Card className="p-4 bg-paper border-line-2">
+          <div className="text-xs font-semibold uppercase tracking-wider text-mute">Issuing Authority</div>
+          <div className="mt-2 text-lg font-bold text-ink truncate">Centurion University / AP Govt</div>
+          <div className="mt-1 text-xs text-faint">Vizianagaram Campus CA</div>
         </Card>
-        <Card className="p-4 bg-slate-900/60 border-slate-800">
-          <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">PQC Standard</div>
-          <div className="mt-2 flex items-center gap-2 text-emerald-400 font-bold text-lg">
+        <Card className="p-4 bg-paper border-line-2">
+          <div className="text-xs font-semibold uppercase tracking-wider text-mute">PQC Standard</div>
+          <div className="mt-2 flex items-center gap-2 text-ok font-bold text-lg">
             <ShieldCheck className="h-5 w-5" /> NIST FIPS 204
           </div>
-          <div className="mt-1 text-xs text-slate-500">Post-Quantum Lattice Signature</div>
+          <div className="mt-1 text-xs text-faint">Post-Quantum Lattice Signature</div>
         </Card>
       </div>
 
       {/* Issue Modal */}
       {issuing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-2xl border border-brand-500/30 bg-slate-900 p-6 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2 text-lg font-bold text-white">
-                <Award className="h-5 w-5 text-brand-400" /> Issue Post-Quantum Certificate
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 ">
+          <div className="w-full max-w-lg rounded border border-line-4 bg-paper p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-line-2 pb-3">
+              <div className="flex items-center gap-2 text-lg font-bold text-ink">
+                <Award className="h-5 w-5 text-ink" /> Issue Post-Quantum Certificate
               </div>
-              <button type="button" onClick={() => setIssuing(false)} className="text-slate-400 hover:text-white">✕</button>
+              <button type="button" onClick={() => setIssuing(false)} className="text-mute hover:text-ink">✕</button>
             </div>
             <form onSubmit={handleIssue} className="mt-4 space-y-4">
               <div>
-                <label className="text-xs font-medium text-slate-300">Certificate / Roll ID</label>
+                <label className="text-xs font-medium text-body">Certificate / Roll ID</label>
                 <input className="input mt-1 w-full" value={form.id} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, id: e.target.value })} required />
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-300">Recipient Full Name</label>
+                <label className="text-xs font-medium text-body">Recipient Full Name</label>
                 <input className="input mt-1 w-full" value={form.recipientName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, recipientName: e.target.value })} required />
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-300">Student / Citizen ID</label>
+                <label className="text-xs font-medium text-body">Student / Citizen ID</label>
                 <input className="input mt-1 w-full" value={form.recipientId} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, recipientId: e.target.value })} required />
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-300">Institution / Issuing Body</label>
+                <label className="text-xs font-medium text-body">Institution / Issuing Body</label>
                 <input className="input mt-1 w-full" value={form.institution} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, institution: e.target.value })} required />
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-300">Credential / Degree Title</label>
+                <label className="text-xs font-medium text-body">Credential / Degree Title</label>
                 <input className="input mt-1 w-full" value={form.certificateType} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, certificateType: e.target.value })} required />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-slate-300">Issue Date</label>
+                  <label className="text-xs font-medium text-body">Issue Date</label>
                   <input type="date" className="input mt-1 w-full" value={form.issueDate} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, issueDate: e.target.value })} required />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-slate-300">Award / Grade</label>
+                  <label className="text-xs font-medium text-body">Award / Grade</label>
                   <input className="input mt-1 w-full" value={form.gradeOrStatus} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, gradeOrStatus: e.target.value })} required />
                 </div>
               </div>
-              <div className="rounded-lg border border-brand-500/20 bg-brand-500/5 p-3 text-xs text-brand-300">
+              <div className="rounded border border-line-4 bg-hov p-3 text-xs text-ink">
                 Signing with Registrar ML-DSA-65 keypair. An immutable commitment block will be anchored to the ledger.
               </div>
               <div className="flex justify-end gap-3 pt-2">
@@ -159,12 +159,12 @@ export default function Certificates() {
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFilter(e.target.value)}
           className="input max-w-md w-full"
         />
-        <div className="text-xs text-slate-400">Showing {filtered.length} credentials</div>
+        <div className="text-xs text-mute">Showing {filtered.length} credentials</div>
       </div>
 
       {/* Certificates List */}
       {loading ? (
-        <div className="py-12 text-center text-sm text-slate-400">Loading verified credentials...</div>
+        <div className="py-12 text-center text-sm text-mute">Loading verified credentials...</div>
       ) : filtered.length === 0 ? (
         <Empty
           title="No Certificates Found"
@@ -173,35 +173,35 @@ export default function Certificates() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filtered.map((cert) => (
-            <Card key={cert.id} className="p-5 border-slate-800 bg-slate-900/50 hover:border-slate-700 transition">
+            <Card key={cert.id} className="p-5 border-line-2 bg-paper hover:border-line-2 transition">
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs text-brand-400 font-semibold">{cert.id}</span>
+                    <span className="font-mono text-xs text-ink font-semibold">{cert.id}</span>
                     <Pill tone="green">ML-DSA-65</Pill>
                   </div>
-                  <h3 className="mt-1.5 text-base font-bold text-white">{cert.recipientName}</h3>
-                  <div className="text-xs text-slate-400">{cert.certificateType}</div>
+                  <h3 className="mt-1.5 text-base font-bold text-ink">{cert.recipientName}</h3>
+                  <div className="text-xs text-mute">{cert.certificateType}</div>
                 </div>
-                <div className="grid h-10 w-10 place-items-center rounded-lg bg-brand-500/10 text-brand-400">
+                <div className="grid h-10 w-10 place-items-center rounded bg-hov text-ink">
                   <Award className="h-5 w-5" />
                 </div>
               </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-2 text-xs border-t border-slate-800/80 pt-3 text-slate-400">
-                <div><span className="text-slate-500">Institution:</span> <span className="text-slate-300 truncate block">{cert.institution}</span></div>
-                <div><span className="text-slate-500">Student ID:</span> <span className="text-slate-300 block">{cert.recipientId}</span></div>
-                <div><span className="text-slate-500">Issue Date:</span> <span className="text-slate-300 block">{cert.issueDate}</span></div>
-                <div><span className="text-slate-500">Ledger Block:</span> <span className="text-slate-300 block">#{cert.blockIndex}</span></div>
+              <div className="mt-4 grid grid-cols-2 gap-2 text-xs border-t border-line-2 pt-3 text-mute">
+                <div><span className="text-faint">Institution:</span> <span className="text-body truncate block">{cert.institution}</span></div>
+                <div><span className="text-faint">Student ID:</span> <span className="text-body block">{cert.recipientId}</span></div>
+                <div><span className="text-faint">Issue Date:</span> <span className="text-body block">{cert.issueDate}</span></div>
+                <div><span className="text-faint">Ledger Block:</span> <span className="text-body block">#{cert.blockIndex}</span></div>
               </div>
 
-              <div className="mt-3 flex items-center justify-between border-t border-slate-800/60 pt-3">
-                <span className="font-mono text-[10px] text-slate-500 truncate max-w-[200px]">
+              <div className="mt-3 flex items-center justify-between border-t border-line-2 pt-3">
+                <span className="font-mono text-[10px] text-faint truncate max-w-[200px]">
                   Hash: {cert.dataHash.slice(0, 18)}…
                 </span>
                 <Link
-                  to={`/verify/${cert.id}`}
-                  className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-400 hover:text-brand-300"
+                  to={`/app/verify/${cert.id}`}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-ink hover:text-ink"
                 >
                   Verify Live <ExternalLink className="h-3 w-3" />
                 </Link>

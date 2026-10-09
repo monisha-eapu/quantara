@@ -95,14 +95,21 @@ def get_job(job_id: str) -> Optional[dict]:
         return next((j for j in _load() if j["id"] == job_id), None)
 
 
-# ------------------------------------------------------------------ IBM Quantum
 def ibm_config() -> dict:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=True)
     token = os.getenv("IBM_QUANTUM_TOKEN", "").strip()
-    saved = (Path.home() / ".qiskit" / "qiskit-ibm.json").exists()
+    saved = False
+    qfile = Path.home() / ".qiskit" / "qiskit-ibm.json"
+    if qfile.exists():
+        try:
+            saved = bool(json.loads(qfile.read_text()))
+        except Exception:
+            saved = False
     return {
         "configured": bool(token) or saved,
         "source": "environment" if token else ("saved account (~/.qiskit)" if saved else None),
-        "channel": os.getenv("IBM_QUANTUM_CHANNEL", "ibm_quantum_platform"),
+        "channel": os.getenv("IBM_QUANTUM_CHANNEL", "ibm_cloud"),
         "instanceConfigured": bool(os.getenv("IBM_QUANTUM_INSTANCE", "").strip()),
         "preferredBackend": os.getenv("IBM_QUANTUM_BACKEND") or None,
     }

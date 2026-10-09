@@ -44,8 +44,9 @@
 }
 
 @layer components {
-  .inp { @apply w-full rounded border border-line bg-card px-3.5 py-[11px] text-[14px] font-normal; }
+  .inp, .input { @apply w-full rounded border border-line bg-card px-3.5 py-[11px] text-[14px] font-normal; }
   .th { @apply px-5 py-3 text-left text-[11px] font-normal uppercase tracking-[0.1em] text-mute; }
   .td { @apply px-5 py-3.5 align-middle; }
+  .label { @apply text-[11px] uppercase tracking-[0.1em] text-mute; }
   .eyebrow { @apply text-[11px] uppercase tracking-[0.1em] text-mute; }
 }

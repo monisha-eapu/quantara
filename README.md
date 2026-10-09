@@ -1,337 +1,197 @@
-# Q-SHIELD AP
-## Quantum-Safe Trust Intelligence for Andhra Pradesh
+# Q-SHIELD AP: Quantum-Safe Trust Framework for Critical Digital Records
 
-### Full Title
-**Q-SHIELD AP: A Hybrid Quantum Machine Learning, Post-Quantum Cryptography and Distributed Ledger Framework for Secure Land Records, Supply Chains and Certificates**
+**Post-quantum cryptography + quantum machine learning + distributed ledger for Andhra Pradesh land registries, agri-supply chains and university credentials.**
 
-### Tagline
-> **QML Detects. PQC Protects. DLT Proves.**
+Qiskit Fall Fest 2026 · Centurion University of Technology and Management (CUTM), Vizianagaram · Use Case 02: Quantum-Safe DLT
 
-### Secondary Tagline
-> **Building Quantum-Ready Trust Infrastructure for Andhra Pradesh**
+## Abstract
 
----
+Q-SHIELD AP is a quantum-safe trust framework for Andhra Pradesh land records, agricultural supply chains and university credentials. It combines post-quantum cryptography (PQC), quantum machine learning (QML) and a hash-chained distributed ledger (DLT) in one full-stack system built with Qiskit, Node.js and React. Novelty: it pairs NIST FIPS 204 ML-DSA-65 signatures, which resist Shor's algorithm, with a Qiskit Level-4 quantum kernel classifier that flags authenticated insider attacks, where a valid signature is attached to a fraudulent mutation. Qiskit Level 4: a custom 4-qubit parameterized circuit (multi-basis Ry/Rz data re-uploading, circular C4 entanglement, R_ZZ phase gates) with a Projected Quantum Kernel and analytical parameter-shift gradients. Optimization-level-3 transpilation to the IBM native basis gives depth 50 and 32 CX gates with all-to-all connectivity, and depth 171 with 55 CZ gates when routed onto a modeled 133-qubit IBM Torino heavy-hex device, with unitary equivalence verified. A BB84 quantum key distribution simulation aborts the channel above an 11% quantum bit error rate, and a React dashboard exposes live verification, ledger and audit views. Empirical benchmark: four models (quantum QSVC, classical RBF SVM, Random Forest, MLP) were evaluated on a synthetic 10,000-record Andhra Pradesh land and supply-chain dataset with a 600/200 train/test split. All four reached 100% recall, so the benchmark shows detection capability, not an empirical accuracy advantage. Quantum advantage indicators: geometric difference g = 72.342 (Huang et al., Nature Communications 2021), Meyer-Wallach entanglement Q = 0.714 and kernel-target alignment 43.7%, against 59.0% for a classical RBF kernel. These metrics describe kernel geometry and are necessary, not sufficient, conditions for advantage. All data is synthetic.
 
-## 1. Hackathon Context
+**Keywords:** post-quantum cryptography, ML-DSA-65, FIPS 204, quantum machine learning, Qiskit, quantum kernel, QSVC, projected quantum kernel, BB84, IBM Quantum, distributed ledger, hash chain, land records, supply chain provenance, insider fraud detection, React, Node.js, FastAPI.
 
-- **Event**: Qiskit Fall Fest 2026 — Day 04 Hackathon
-- **Venue**: Centurion University of Technology and Management (CUTM), Vizianagaram, Andhra Pradesh
-- **Official Track**: Use Case 02 — Quantum-Safe DLT for Land Records and Supply Chains
-- **Scope**: Hybrid Quantum-Classical Security Architecture with genuine Quantum Machine Learning (QML), native Post-Quantum Cryptography (PQC), and permissioned Distributed Ledger Technology (DLT).
-- **Demonstration Notice**: Fictional/synthetic demonstration data only. Prototype for hackathon evaluation and architectural feasibility; not an official government deployment.
+## Contents
 
----
+1. [The problem](#the-problem)
+2. [Solution overview](#solution-overview)
+3. [Results](#results)
+4. [Quick start](#quick-start)
+5. [Running from the terminal](#running-from-the-terminal)
+6. [Tour of the web app](#tour-of-the-web-app)
+7. [Repository layout](#repository-layout)
+8. [Limitations and honest notes](#limitations-and-honest-notes)
+9. [Documentation](#documentation)
 
-## 2. Executive Summary & Core Security Paradigm
+## The problem
 
-Traditional cybersecurity platforms evaluate authenticity with a single question:
+Land titles, product provenance and degrees must stay trustworthy for decades. Most registries sign records with RSA or ECDSA, and Shor's algorithm breaks both on a large enough quantum computer, so a forged signature would look identical to a real one. Cryptography also checks only that a signature is valid. It cannot tell that a valid signature was applied to a fraudulent change by a coerced or compromised insider.
 
-> *"Is this digital signature cryptographically valid?"*
+## Solution overview
 
-In high-stakes public infrastructure—such as land mutation registries, pharmaceutical distribution chains, and university credential vaults—compromised authorized credentials, insider coercion, and rapid automated fraud bypass classical checks. Furthermore, emerging quantum computers running Shor's algorithm threaten to retroactively invalidate traditional RSA and elliptic-curve (ECDSA) signatures.
+Three layers, each answering a different question.
 
-**Q-SHIELD AP introduces a tri-layer defense architecture:**
-
-```text
-Traditional Security:  [ Is the signature valid? ]
-                                    ↓
-Q-SHIELD AP:          [ 1. PQC:  Is the signature quantum-resistant? (ML-DSA-65) ]
-                                    +
-                      [ 2. QML:  Does the behavioral pattern look legitimate? (QLIE) ]
-                                    +
-                      [ 3. DLT:  Does the historical ledger remain tamper-free? (Hash Chain) ]
-```
-
-### The Three Pillars
-
-| Pillar | Subsystem | Core Technology | Role |
-| :--- | :--- | :--- | :--- |
-| **QML** | **QLIE** (Quantum Ledger Intelligence Engine) | Qiskit 1.x, `ZZFeatureMap`, Quantum Kernel Classifier (QSVC) | **Detects** behavioral anomalies & insider fraud even when credentials appear valid. |
-| **PQC** | Post-Quantum Cryptography Layer | Native OpenSSL 3.5 / Node.js 24 **ML-DSA-65** (NIST FIPS 204) | **Protects** records, credentials, and mutations against Shor's algorithm. |
-| **DLT** | Distributed Ledger Continuity | SHA-256 state continuity & cryptographic hash chains | **Proves** tamper-evident historical auditability and sequence provenance. |
-
----
-
-## 3. End-to-End System Architecture
-
-```text
-                     ┌───────────────────────────────────┐
-                     │   Authorized Authority / User     │
-                     │ (Revenue Officer, Farmer, CUTM CA)│
-                     └─────────────────┬─────────────────┘
-                                       │
-                                       ▼
-                     ┌───────────────────────────────────┐
-                     │   Transaction / Mutation Record   │
-                     │     (Survey No, Batch, Degree)    │
-                     └─────────────────┬─────────────────┘
-                                       │
-                    ┌──────────────────┴──────────────────┐
-                    ▼                                     ▼
-         [ PQC AUTHENTICATION ]               [ FEATURE EXTRACTION ]
-           Node 24 / ML-DSA-65                  8 Behavioral Telemetry Features
-           Lattice-based Sig Verification              MinMax Scaled to [0, 2π]
-                    │                                     │
-                    ▼                                     ▼
-         [ PQC STATUS: VALID ]                [ QUANTUM FEATURE ENCODING ]
-                                                4-Qubit ZZFeatureMap (reps=2)
-                                                16-dim Hilbert Space Embedding
-                                                          │
-                                                          ▼
-                                              [ QLIE QUANTUM KERNEL ]
-                                                Statevector Transition Fidelity
-                                                Dual-Sample Gram Matrix Computation
-                                                          │
-                                                          ▼
-                                              [ RISK ASSESSMENT ENGINE ]
-                                                QSVC Decision Boundary Score
-                                                Calibrated Probability Mapping
-                                                          │
-                    ┌─────────────────────────────────────┘
-                    ▼
-         ┌────────────────────────────────────────────────────────┐
-         │          SECURITY DECISION POLICY ENGINE               │
-         │  PQC Invalid               →  🚨 BLOCK                 │
-         │  DLT Integrity Failed      →  🚨 BLOCK                 │
-         │  PQC Valid + DLT + QML Low →  🟢 APPROVE               │
-         │  PQC Valid + DLT + QML High→  ⚠️ HUMAN REVIEW REQUIRED │
-         └──────────────────────────┬─────────────────────────────┘
-                                    │
-                                    ▼
-         ┌────────────────────────────────────────────────────────┐
-         │         APPEND-ONLY HASH-CHAINED LEDGER                │
-         │  Previous Hash ← Current Block Hash ← SHA-256 State   │
-         └──────────────────────────┬─────────────────────────────┘
-                                    │
-                                    ▼
-         ┌────────────────────────────────────────────────────────┐
-         │      Q-SHIELD AP DASHBOARD & AUDIT STREAM              │
-         │  Live Demo · Land Registry · QLIE Intelligence Center │
-         └────────────────────────────────────────────────────────┘
-```
-
----
-
-## 4. QLIE: Quantum Ledger Intelligence Engine
-
-The Quantum Ledger Intelligence Engine (**QLIE**) is the core machine-learning component of Q-SHIELD AP. It executes genuine quantum kernel evaluations using Qiskit 1.x and Qiskit Aer.
-
-### 4.1 Feature Extraction Pipeline
-Transactions are mapped into an 8-dimensional behavioral feature vector:
-1. `transaction_frequency`: Number of record interactions per month.
-2. `transaction_velocity`: Frequency of transfers over short temporal windows (mutations/hr).
-3. `transaction_value`: Transaction consideration or asset appraisal (INR).
-4. `ownership_change_frequency`: Rate of title handoffs across recent history.
-5. `historical_owner_count`: Total distinct past owners.
-6. `time_since_previous_transaction`: Elapsed hours since prior registered mutation.
-7. `geographical_distance`: Physical distance (km) between recording district nodes.
-8. `timestamp_deviation`: Offset against normative district business hours (seconds).
-
-### 4.2 Preprocessing Without Data Leakage
-Features are normalized using an independent `QLIEPreprocessor` fitted exclusively on training data and serialized to `qml/models/preprocessor.json`. The top 4 features are scaled into the interval $[0, 2\pi]$ for quantum phase rotational gate encoding.
-
-### 4.3 Quantum Circuit & Feature Map
-- **Feature Map**: Qiskit `ZZFeatureMap`
-- **Qubits**: 4 qubits
-- **Circuit Depth**: 31 layers
-- **Entanglement**: Full all-to-all entanglement topology
-- **Gates**:
-  - 8 Hadamard ($H$) gates
-  - 8 Single-qubit $R_Z(\theta)$ rotational gates
-  - 12 Entangling Two-qubit $CX$ (CNOT) gates
-  - 6 Multi-qubit phase $R_{ZZ}(\theta_{ij})$ interaction gates
-
-```text
-     ┌───┐┌──────────────┐
-q_0: ┤ H ├┤ Rz(2.0*x[0]) ├──■─────────────────────■───────────────────── ...
-     ├───┤├──────────────┤┌─┴─┐┌───────────────┐┌─┴─┐
-q_1: ┤ H ├┤ Rz(2.0*x[1]) ├┤ X ├┤ Rz(2.0*x[01]) ├┤ X ├──■────────────── ...
-     ├───┤├──────────────┤└───┘└───────────────┘└───┘┌─┴─┐┌───────────┐
-q_2: ┤ H ├┤ Rz(2.0*x[2]) ├───────────────────────────┤ X ├┤ Rz(x[12]) ├── ...
-     ├───┤├──────────────┤                           └───┘└───────────┘
-q_3: ┤ H ├┤ Rz(2.0*x[3]) ├──■────────────────────────────────────────── ...
-     └───┘└──────────────┘┌─┴─┐┌───────────────┐┌─┴─┐
-                          │ X ├┤ Rz(2.0*x[03]) ├┤ X ├────────────────── ...
-                          └───┘└───────────────┘└───┘
-```
-
-### 4.4 Quantum Kernel Computation
-For feature vectors $x_i$ and $x_j$, the quantum state transition fidelity is evaluated directly:
-
-$$K(x_i, x_j) = |\langle \psi(x_i) | \psi(x_j) \rangle|^2 = |\langle 0^{\otimes n} | U^\dagger(x_i) U(x_j) | 0^{\otimes n} \rangle|^2$$
-
-Statevector simulation computes this transition without sampling noise, yielding a positive semi-definite Gram matrix passed to the dual-form Support Vector Classifier.
-
----
-
-## 5. Empirical Benchmark: Scientific Honesty
-
-In strict adherence to scientific integrity, **Q-SHIELD AP reports empirical evaluation results without fabricating quantum advantage.**
-
-The benchmark below is saved in `qml/benchmark.json` and computed over an independent test split of 2,000 synthetic transactions:
-
-| Metric | Quantum Kernel Classifier (QSVC) | Classical Support Vector Machine (RBF) |
+| Layer | Question it answers | Technology |
 | :--- | :--- | :--- |
-| **Model Type** | Qiskit `ZZFeatureMap` (4q) + Statevector Kernel | `sklearn.svm.SVC` (RBF kernel, $C=1.0$) |
-| **Accuracy** | **88.0%** | **100.0%** |
-| **Precision** | **88.0%** | **100.0%** |
-| **Recall** | **100.0%** | **100.0%** |
-| **F1-Score** | **93.6%** | **100.0%** |
-| **ROC-AUC** | **94.5%** | **100.0%** |
-| **Training Time** | 2.15 seconds | 0.002 seconds |
-| **Inference Latency** | ~3.5 milliseconds | ~0.05 milliseconds |
-| **Circuit Depth** | 31 gates | N/A (Classical matrix) |
+| **PQC** | Who signed this, and is it unaltered? | ML-DSA-65 (NIST FIPS 204) via native OpenSSL 3.5 in Node.js 24. Public key 1,952 B, signature 3,309 B |
+| **DLT** | Has history been rewritten? | Append-only SHA-256 hash chain; each block commits to the previous one and carries an ML-DSA signature |
+| **QML** | Is this authentic record behaving suspiciously? | Qiskit 4-qubit quantum kernel classifier (QLIE) scoring 8 behavioural features |
 
-### Scientific Rigor & NISQ Reality
-- **Empirical Observation**: On linearly separable or moderately non-linear classical tabular data, classical RBF SVM achieves superior accuracy with negligible compute latency.
-- **Scientific Honesty**: We **do not claim quantum supremacy**. Current NISQ simulators impose quadratic kernel matrix overhead ($\mathcal{O}(N^2)$).
-- **Architectural Value**: QLIE proves that quantum Hilbert space feature embeddings can detect complex, non-linear behavioral fraud signatures. As quantum processors scale beyond 50 error-corrected qubits, non-classical kernel maps offer cryptographic-grade pattern resistance against adversarial evasion.
+**Decision policy**
 
----
+| PQC | Ledger | QML risk | Outcome |
+| :---: | :---: | :---: | :--- |
+| invalid | any | any | **Block** |
+| valid | broken | any | **Block** |
+| valid | intact | low | **Approve** |
+| valid | intact | high | **Human review** |
 
-## 6. Post-Quantum Cryptography (PQC) Layer
-
-- **Standard**: **ML-DSA-65** (Module-Lattice-Based Digital Signature Algorithm), standardized in **NIST FIPS 204** (formerly CRYSTALS-Dilithium).
-- **Security Category**: NIST Category 3 (equivalent to AES-192 against both classical and quantum cryptanalysis).
-- **Implementation**: Native OpenSSL 3.5 via Node.js 24 LTS `crypto` module.
-- **Key Custody**: Private keys stored in secure local keystore (`server/data/keys/*.pem`, mode 0600) with simulated HSM custody. Private keys are never committed to the distributed ledger or exposed via APIs.
-
----
-
-## 7. Distributed Ledger Technology (DLT) Layer
-
-Q-SHIELD AP operates a permissioned, append-only, cryptographic hash-chained ledger:
-- **Block Header**: `index`, `timestamp`, `recordId`, `recordType`, `action`, `dataHash`, `signature`, `algorithm`, `signerId`, `previousHash`.
-- **Block Hash**: Canonical SHA-256 commitment over the entire header.
-- **Genesis Block**: Seeded at initialization with null predecessor (`0^64`).
-- **Live Tamper Detection**: If any historical database cell (e.g. land acreage or owner name) is altered, the recomputed content hash diverges from the ledger anchor, immediately tripping a chain integrity fault and triggering system-wide isolation.
-
----
-
-## 8. Security Decision Policy Matrix
-
-The security decision engine synthesizes cryptographic, ledger, and behavioral telemetry into an actionable resolution:
-
-| Scenario | PQC Signature | DLT Integrity | QML Behavioral Risk | Final Resolution | Action Summary |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Normal Mutation** | ✓ VALID | ✓ INTACT | 🟢 Low (< 35%) | **APPROVED** | Verified authentic and normative. Written to ledger tip. |
-| **Compromised Insider** | ✓ VALID | ✓ INTACT | 🔴 High (≥ 65%) | **HUMAN REVIEW** | **Key Differentiator**: Cryptography is valid, but behavioral pattern is fraudulent. Escalated to senior registrar. |
-| **Database Injection** | ✗ INVALID | ✗ BROKEN | 🔴 High | **BLOCKED** | Cryptographic hash or signature mismatch. Blocked immediately. |
-| **Replay / Stale Block** | ✓ VALID | ✗ BROKEN | 🟡 Medium | **BLOCKED** | Ledger continuity failure; out-of-order execution attempt. |
-
----
-
-## 9. Andhra Pradesh Target Application Domains
-
-1. **AP Land Records & Revenue Department**:
-   - Fictional prototypes for Vizianagaram (Bhogapuram, Denkada) and Visakhapatnam rural mandals.
-   - Prevents unauthorized acreage mutation, passbook forgery, and double-sale deed injection.
-2. **Agricultural Supply Chain Provenance**:
-   - Provenance tracking for Vizianagaram Jute, Chittoor Totapuri Mangoes, and Guntur Mirchi batches.
-   - Detects abnormal transit delays, unexpected route leaps, and quantity discrepancies.
-3. **Institutional Credentials (CUTM)**:
-   - Tamper-proof degrees and skill credentials issued by Centurion University of Technology and Management, Vizianagaram.
-   - Publicly verifiable in milliseconds via ML-DSA-65 signature anchors.
-
----
-
-## 10. Repository File Structure
+The QML layer is advisory: it can route a record to a reviewer but cannot approve or block on its own. The quantum service never receives records, keys or signatures.
 
 ```text
-quantara/
-├── demo.py                          # Master standalone terminal demonstration
-├── dataset/
-│   ├── generate.py                  # Synthetic AP dataset generator (reproducible seed)
-│   └── data.csv                     # 2,000 generated synthetic transactions
-├── qml/
-│   ├── config.py                    # QLIE configuration and feature definitions
-│   ├── preprocessing.py             # QLIE MinMaxScaler and feature pipeline
-│   ├── feature_map.py               # Qiskit ZZFeatureMap circuit builder
-│   ├── quantum_kernel.py            # Transition fidelity Gram matrix engine
-│   ├── training.py                  # QML vs Classical SVM benchmark pipeline
-│   ├── inference.py                 # Live QLIE prediction and calibrated risk scorer
-│   ├── circuit_visualizer.py        # ASCII circuit and gate decomposition
-│   ├── benchmark.json               # Genuine experiment benchmark results
-│   └── models/                      # Serialized trained models & preprocessors
-├── quantum-service/
-│   ├── app/
-│   │   ├── main.py                  # FastAPI service exposing /qml and /security endpoints
-│   │   ├── qml.py                   # Threat demonstration helper
-│   │   └── threat_lab.py            # Shor & Grover circuit runners
-│   ├── vqc_ledger_anomaly.py        # 8-Qubit VQC with TwoLocal ansatz
-│   └── requirements.txt             # Python dependencies
-├── server/
-│   ├── src/
-│   │   ├── crypto/                  # ML-DSA-65 keystore, canonicalization, schemes
-│   │   ├── services/                # Ledger, land records, supply chain, certificates
-│   │   └── routes/                  # Express API routes
-│   └── data/                        # SQLite DB and signer private keys
-├── web/
-│   ├── src/
-│   │   ├── pages/                   # LiveDemo, QuantumLab (QLIE), Certificates, Land, etc.
-│   │   └── components/              # Layout, design system, UI components
-│   └── package.json
-├── package.json
-└── README.md
+ Record ──► ML-DSA-65 verify ──┐
+   │                           ├─► Policy engine ─► Approve / Review / Block ─► Hash-chained ledger ─► Dashboard + audit
+   └─► 8 features ─► QLIE ─────┘
+        (4-qubit kernel, C^16)         BB84 channel protects replica-to-replica transit
 ```
 
----
+### QLIE circuit (Qiskit Level 4)
 
-## 11. Installation & Quickstart
+- Custom 4-qubit parameterized circuit in a 16-dimensional Hilbert space (C^16).
+- Hadamard layer, multi-basis `Ry(x)·Rz(2x)` data re-uploading, circular C4 CNOT ring with cross-ladder shortcuts (0→2, 1→3), and non-linear `R_ZZ(2(π−xᵢ)(π−xⱼ))` phase gates.
+- Fidelity kernel and Projected Quantum Kernel (single-body ⟨Zᵢ⟩ and two-body ⟨ZᵢZⱼ⟩ observables).
+- Analytical parameter-shift gradients.
+- Hardware-aware compilation (see Results).
 
-### Prerequisites
-- Node.js 24 LTS (recommended for native ML-DSA-65 support)
-- Python 3.10+ (with virtual environment)
+## Results
 
-### Step 1: Automated Setup
-Run the repository bootstrap script to install Node dependencies, initialize the Python virtual environment, install Qiskit packages, and seed initial demo ledgers:
+### Hardware-aware compilation
+
+Compiled onto a 133-qubit IBM Torino device model (heavy-hex coupling map, native `cz, rz, sx, x`, calibrated errors). Reproduce with `npm run qml:eval` (Part 2) or in the web app.
+
+| Level | Depth | 2Q gates | Est. success | Notes |
+| :--- | ---: | ---: | ---: | :--- |
+| O0 | 269 | 87 | 50.1% | no optimisation |
+| O1 | 221 | 84 | 69.3% | |
+| O2 | 174 | 57 | 76.1% | |
+| O3 | 174 | 57 | 77.3% | Qiskit's highest preset level |
+| **L4** | **171** | **55** | **77.8%** | O3 + best-of-16 routing search + calibration-aware scoring + unitary-equivalence check |
+
+With all-to-all connectivity (no routing) the same circuit compiles to depth 50 and 32 CX. The gap is the routing cost of real hardware. Success probability is estimated from calibration data and is not a hardware run. "L4" is this project's label, not a Qiskit setting.
+
+### Benchmark
+
+Synthetic Andhra Pradesh dataset (10,000 rows across 10 districts and 55 mandals). The quantum kernel is evaluated on a **600-sample training / 200-sample test** subset because the Gram matrix is O(N²).
+
+| Model | Accuracy | Recall | F1 | ROC-AUC | Inference |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| Quantum QSVC (4 qubits) | 100% | 100% | 1.000 | 1.000 | ~0.5 ms |
+| Classical RBF SVM | 100% | 100% | 1.000 | 1.000 | <0.1 ms |
+| Random Forest (100 trees) | 100% | 100% | 1.000 | 1.000 | ~0.01 ms |
+| MLP | 100% | 100% | 1.000 | 1.000 | <0.1 ms |
+
+Every model separates this dataset perfectly, so it **does not show that the quantum model is more accurate**. The benchmark demonstrates that the pipeline works end to end.
+
+### Kernel geometry indicators
+
+| Metric | Value |
+| :--- | ---: |
+| Geometric difference g(K_Q, K_C), Huang et al. 2021 | 72.342 |
+| Meyer-Wallach entanglement Q | 0.714 |
+| Kernel-target alignment, quantum kernel | 43.7% |
+| Kernel-target alignment, classical RBF kernel | 59.0% |
+
+A large g is a necessary condition for a possible quantum advantage, not proof of one, and the classical kernel aligns better with the labels here. We report these as descriptions of the kernel, not as a demonstrated advantage.
+
+### Quantum key distribution (BB84)
+
+Qiskit Aer simulation. Honest channel: QBER ≈ 0%. Intercept-resend eavesdropper: QBER ≈ 25–30% (theory: 25%). The channel aborts at 11% QBER and no key is issued.
+
+## Quick start
+
+**Prerequisites:** Node.js 24 or later (native ML-DSA needs OpenSSL 3.5) and Python 3.10 or later.
 
 ```bash
-npm run setup
+git clone <repo-url> quantara-1 && cd quantara-1
+npm run setup     # npm install + Python virtualenv in quantum-service/.venv
+npm run dev       # server + web + quantum service together
 ```
 
-### Step 2: Run Master Terminal Demo
-Execute the full terminal demo with zero manual configuration (auto-redirects to the Python virtual environment):
+| Service | URL | Role |
+| :--- | :--- | :--- |
+| Web | http://localhost:5173 | React 19 + Vite + Tailwind dashboard |
+| API | http://localhost:4000 | Express, SQLite ledger, ML-DSA-65 signing |
+| Quantum service | http://127.0.0.1:8001 | FastAPI, Qiskit 2.2.3, Aer, IBM Runtime |
+
+Optional: copy `.env.example` to `.env` and set `IBM_QUANTUM_TOKEN` to enable the IBM Quantum hardware target. Never commit a real token.
+
+## Running from the terminal
+
+| Command | What it does |
+| :--- | :--- |
+| `npm run qml:eval` | Full technical evaluator: circuit architecture, hardware-aware compilation, kernel metrics, benchmark, live personas |
+| `npm run qml` | Combined demo: ML-DSA verification, BB84 channel, QML screen, combined decision |
+| `npm run demo` | Standalone terminal demo |
+| `npm run seed` | Re-seed the demo ledger (2,481 signed entities) |
+| `npm test` | Server tests and quantum-service tests |
+| `npm run typecheck` | TypeScript check for server and web |
+| `npm run build` | Production build |
+
+Compile report only, as JSON:
 
 ```bash
-python demo.py
+quantum-service/.venv/bin/python -c "
+from qml.feature_map import hardware_compile_report as h
+import json; r = h(backend_name='torino', seeds=16); r.pop('ascii'); print(json.dumps(r, indent=2))"
 ```
 
-### Step 3: Start Full-Stack Dev Services
-Launch the Node.js Express server (`:4000`), Python FastAPI QML service (`:8001`), and Vite React frontend (`:5173`) concurrently:
+`backend_name` accepts `torino`, `sherbrooke` or `brisbane`.
 
-```bash
-npm run dev
+## Tour of the web app
+
+Sign in is a prototype screen; any input opens the workspace.
+
+| Page | Route | What to look at |
+| :--- | :--- | :--- |
+| Overview | `/app` | Integrity scan, security alerts, ledger activity |
+| Land Records | `/app/land` | Create, sign and verify records; open a record to tamper with it and watch verification fail |
+| Supply Chain | `/app/supply-chain` | Signed custody events per batch |
+| Certificates | `/app/certificates` | Issue and verify ML-DSA-signed credentials |
+| Verification | `/app/verify` | Step-by-step verification from first principles |
+| Ledger | `/app/ledger` | Blocks, hash links, full-chain verification |
+| Post-Quantum | `/app/post-quantum` | Scheme comparison, legacy-signature migration queue |
+| Quantum Lab | `/app/quantum` | **QLIE inference, circuit viewer, Hardware Compilation (L4) with re-run, benchmark, QKD, IBM threat lab** |
+| Live Demo | `/app/demo` | Three scenarios: legitimate transfer (approved), insider fraud (human review), tampered record (blocked) |
+| Audit Trail | `/app/audit` | Append-only log of actions |
+
+## Repository layout
+
+```text
+server/           Express + SQLite API, ML-DSA-65 signing, ledger, audit
+web/              React 19 + Vite frontend
+quantum-service/  FastAPI service: circuits, QML endpoints, IBM Runtime
+qml/              QLIE: feature map, quantum kernel, training, inference, compile report
+dataset/          Synthetic Andhra Pradesh dataset generator and data.csv
+scripts/          setup and launch scripts
+qml_evaluator.py  Terminal evaluator behind `npm run qml:eval`
+artifacts/        Generated figures
 ```
 
-Open your browser at **`http://localhost:5173`**.
+## Limitations and honest notes
+
+- **All data is synthetic.** Names, survey numbers and transactions are fictional. No real registry data is used.
+- **No empirical quantum advantage is claimed.** Classical baselines match the quantum model on this dataset.
+- **The ledger is single-node.** A production deployment would replicate it across independent authorities with Byzantine fault-tolerant consensus.
+- **The hash chain is tamper-evident, not the post-quantum part.** SHA-256 is expected to stay sound against known quantum attacks. The signature scheme is what needed replacing.
+- **Quantum workloads run on simulators or device models by default.** Real IBM hardware is optional and needs a token.
+- **Nothing here breaks RSA, ECC or ML-DSA.** The Shor demonstration factors N = 15.
+- **Sign-in is a prototype screen** with no real authentication.
+
+## Documentation
+
+- [Technical report](TECHNICAL_REPORT.md): mathematical formulation and specifications
+- [Pitch deck guide](PITCH_DECK_GUIDE.md): five-minute presentation script
+- [Judges' defence FAQ](JUDGES_DEFENSE_FAQ.md): answers to likely technical questions
 
 ---
 
-## 12. Two-Minute Judge Demo Sequence
-
-When demonstrating to hackathon evaluators at CUTM Vizianagaram:
-
-| Time | Stage | Action & Screen | Evaluator Takeaway |
-| :--- | :--- | :--- | :--- |
-| **0:00–0:20** | **Problem Framing** | Overview / Dashboard | Explain the quantum threat to long-lived AP records (Shor's algorithm breaks RSA/ECC). |
-| **0:20–0:45** | **Live Security Demo** | `/demo` → **Scenario 1** | Run standard Vizianagaram land transfer: PQC Valid, DLT Valid, QML Low Risk → **APPROVED**. |
-| **0:45–1:15** | **The Key Novelty** | `/demo` → **Scenario 2** | Run rapid mutation: **PQC Valid + DLT Valid + QML High Risk → HUMAN REVIEW**. Proves cryptography alone is insufficient against behavioral fraud! |
-| **1:15–1:35** | **Tamper Detection** | `/demo` → **Scenario 3** | Show direct database tampering: ML-DSA signature and block continuity fail → **BLOCKED**. |
-| **1:35–1:50** | **QLIE Inspector** | `/quantum` | Inspect the genuine 4-Qubit `ZZFeatureMap` ASCII circuit, gate depth, and side-by-side benchmark with Classical SVM. |
-| **1:50–2:00** | **Final Pitch** | Wrap up | *"QML Detects. PQC Protects. DLT Proves."* |
-
----
-
-## 13. Limitations & Future Scope
-
-- **Synthetic Telemetry**: Built upon realistic synthetic transaction distributions; real government deployments require formal data privacy impact assessments.
-- **Simulator Workloads**: Default execution uses Qiskit Aer statevectors; optional live execution on IBM Quantum hardware is supported via `.env` API tokens.
-- **Hardware Scalability**: Full NISQ error mitigation (ZNE / PEC) and quantum memory registers are required before physical QPUs can match classical throughput for high-frequency transactions.
-
----
-
-### **Q-SHIELD AP**
-**Centurion University of Technology and Management, Vizianagaram**  
-*Qiskit Fall Fest 2026 — Day 04 Hackathon*  
-**QML Detects. PQC Protects. DLT Proves.**
+**Q-SHIELD AP** · Qiskit Fall Fest 2026 · CUTM Vizianagaram · *QML detects. PQC protects. DLT proves.*

@@ -30,4 +30,8 @@ def get_circuit_details(num_qubits: int = 4, reps: int = 2) -> Dict[str, Any]:
         "gate_breakdown": ops,
         "entanglement": "Full all-to-all cross-correlation",
         "ascii_diagram": ascii_art,
+        "ascii_circuit": ascii_art,
+        "gate_counts": ops,
+        "feature_map_name": "Level-4 Custom Multi-Basis PQC",
+        "parameter_count": qc.num_parameters,
     }

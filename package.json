@@ -12,6 +12,7 @@
     "dev:quantum": "node scripts/quantum.js",
     "demo": "python demo.py",
     "qml": "node scripts/qml.js",
+    "qml:eval": "python3 qml_evaluator.py",
     "build": "npm run build -w server && npm run build -w web",
     "start": "concurrently -k -n server,quantum -c blue,magenta \"npm run start -w server\" \"npm:dev:quantum\"",
     "seed": "npm run seed -w server",

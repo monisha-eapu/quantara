@@ -143,21 +143,21 @@ export default function LiveDemo() {
             <div
               key={sc.id}
               onClick={() => runScenario(sc)}
-              className={`p-5 cursor-pointer transition rounded-2xl glass border ${
+              className={`p-5 cursor-pointer transition rounded  border ${
                 isSelected
-                  ? "border-brand-500 bg-brand-500/10 shadow-lg shadow-brand-500/10"
-                  : "border-slate-800 bg-slate-900/50 hover:border-slate-700"
+                  ? "border-line-4 bg-hov shadow-lg "
+                  : "border-line-2 bg-paper hover:border-line-2"
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-mono font-semibold text-brand-400">DEMO SCENARIO</span>
+                <span className="text-xs font-mono font-semibold text-ink">DEMO SCENARIO</span>
                 <Pill tone={sc.expectedTone}>
                   {sc.expectedDecision.replace("_", " ")}
                 </Pill>
               </div>
-              <h3 className="mt-2 text-base font-bold text-white">{sc.title}</h3>
-              <p className="mt-1 text-xs text-slate-400 leading-relaxed">{sc.subtitle}</p>
-              <div className="mt-4 flex items-center gap-2 text-xs font-semibold text-brand-400">
+              <h3 className="mt-2 text-base font-bold text-ink">{sc.title}</h3>
+              <p className="mt-1 text-xs text-mute leading-relaxed">{sc.subtitle}</p>
+              <div className="mt-4 flex items-center gap-2 text-xs font-semibold text-ink">
                 <Play className="h-3.5 w-3.5" /> Click to Run Live Pipeline
               </div>
             </div>
@@ -166,14 +166,14 @@ export default function LiveDemo() {
       </div>
 
       {/* Execution Pipeline View */}
-      <Card className="p-6 border-slate-800 bg-slate-900/70">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+      <Card className="p-6 border-line-2 bg-paper">
+        <div className="flex items-center justify-between border-b border-line-2 pb-4">
           <div>
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-brand-400" /> Security Pipeline Execution
+            <h2 className="text-lg font-bold text-ink flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-ink" /> Security Pipeline Execution
             </h2>
-            <div className="text-xs text-slate-400 mt-0.5">
-              Target Entity: <span className="font-mono text-slate-200">DEMO-TX-{selectedScenario.id.toUpperCase()}</span> ({selectedScenario.desc})
+            <div className="text-xs text-mute mt-0.5">
+              Target Entity: <span className="font-mono text-body">DEMO-TX-{selectedScenario.id.toUpperCase()}</span> ({selectedScenario.desc})
             </div>
           </div>
           <Button
@@ -189,99 +189,99 @@ export default function LiveDemo() {
         {/* 4 Pipeline Stages */}
         <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Stage 1: PQC */}
-          <div className={`p-4 rounded-xl border transition ${
-            pipeline.step >= 1 ? "border-brand-500/40 bg-brand-500/5" : "border-slate-800 bg-slate-900/30 opacity-50"
+          <div className={`p-4 rounded border transition ${
+            pipeline.step >= 1 ? "border-line-4 bg-hov" : "border-line-2 bg-paper opacity-50"
           }`}>
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-mono font-semibold uppercase text-brand-400">Stage 1: PQC</span>
-              <Shield className="h-4 w-4 text-brand-400" />
+              <span className="text-[11px] font-mono font-semibold uppercase text-ink">Stage 1: PQC</span>
+              <Shield className="h-4 w-4 text-ink" />
             </div>
-            <div className="mt-2 font-bold text-sm text-white">ML-DSA-65 Signature</div>
-            <div className="mt-1 text-xs text-slate-400">NIST FIPS 204 Lattice Auth</div>
+            <div className="mt-2 font-bold text-sm text-ink">ML-DSA-65 Signature</div>
+            <div className="mt-1 text-xs text-mute">NIST FIPS 204 Lattice Auth</div>
             <div className="mt-3">
               {pipeline.step >= 1 ? (
                 pipeline.result ? (
                   <span className={`inline-flex items-center gap-1 text-xs font-semibold ${
-                    pipeline.result.pqc_verification.status === "VALID" ? "text-emerald-400" : "text-rose-400"
+                    pipeline.result.pqc_verification.status === "VALID" ? "text-ok" : "text-bad"
                   }`}>
                     {pipeline.result.pqc_verification.status === "VALID" ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
                     {pipeline.result.pqc_verification.status}
                   </span>
                 ) : (
-                  <span className="text-xs text-brand-300 animate-pulse">Verifying lattice...</span>
+                  <span className="text-xs text-ink animate-pulse">Verifying lattice...</span>
                 )
               ) : (
-                <span className="text-xs text-slate-500">Waiting...</span>
+                <span className="text-xs text-faint">Waiting...</span>
               )}
             </div>
           </div>
 
           {/* Stage 2: DLT */}
-          <div className={`p-4 rounded-xl border transition ${
-            pipeline.step >= 2 ? "border-cyan-500/40 bg-cyan-500/5" : "border-slate-800 bg-slate-900/30 opacity-50"
+          <div className={`p-4 rounded border transition ${
+            pipeline.step >= 2 ? "border-line-4 bg-hov" : "border-line-2 bg-paper opacity-50"
           }`}>
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-mono font-semibold uppercase text-cyan-400">Stage 2: DLT</span>
-              <Link2 className="h-4 w-4 text-cyan-400" />
+              <span className="text-[11px] font-mono font-semibold uppercase text-ink">Stage 2: DLT</span>
+              <Link2 className="h-4 w-4 text-ink" />
             </div>
-            <div className="mt-2 font-bold text-sm text-white">Ledger Hash Integrity</div>
-            <div className="mt-1 text-xs text-slate-400">SHA-256 State Continuity</div>
+            <div className="mt-2 font-bold text-sm text-ink">Ledger Hash Integrity</div>
+            <div className="mt-1 text-xs text-mute">SHA-256 State Continuity</div>
             <div className="mt-3">
               {pipeline.step >= 2 ? (
                 pipeline.result ? (
                   <span className={`inline-flex items-center gap-1 text-xs font-semibold ${
-                    pipeline.result.dlt_validation.status === "VALID" ? "text-emerald-400" : "text-rose-400"
+                    pipeline.result.dlt_validation.status === "VALID" ? "text-ok" : "text-bad"
                   }`}>
                     {pipeline.result.dlt_validation.status === "VALID" ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
                     {pipeline.result.dlt_validation.chain_integrity}
                   </span>
                 ) : (
-                  <span className="text-xs text-cyan-300 animate-pulse">Hashing blocks...</span>
+                  <span className="text-xs text-ink animate-pulse">Hashing blocks...</span>
                 )
               ) : (
-                <span className="text-xs text-slate-500">Waiting...</span>
+                <span className="text-xs text-faint">Waiting...</span>
               )}
             </div>
           </div>
 
           {/* Stage 3: QML */}
-          <div className={`p-4 rounded-xl border transition ${
-            pipeline.step >= 3 ? "border-purple-500/40 bg-purple-500/5" : "border-slate-800 bg-slate-900/30 opacity-50"
+          <div className={`p-4 rounded border transition ${
+            pipeline.step >= 3 ? "border-line-4 bg-hov" : "border-line-2 bg-paper opacity-50"
           }`}>
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-mono font-semibold uppercase text-purple-400">Stage 3: QML</span>
-              <Atom className="h-4 w-4 text-purple-400" />
+              <span className="text-[11px] font-mono font-semibold uppercase text-ink">Stage 3: QML</span>
+              <Atom className="h-4 w-4 text-ink" />
             </div>
-            <div className="mt-2 font-bold text-sm text-white">QLIE Quantum Kernel</div>
-            <div className="mt-1 text-xs text-slate-400">4-Qubit ZZFeatureMap</div>
+            <div className="mt-2 font-bold text-sm text-ink">QLIE Quantum Kernel</div>
+            <div className="mt-1 text-xs text-mute">4-Qubit ZZFeatureMap</div>
             <div className="mt-3">
               {pipeline.step >= 3 ? (
                 pipeline.result ? (
                   <span className={`inline-flex items-center gap-1 text-xs font-semibold ${
-                    pipeline.result.qml_intelligence.risk_score > 0.65 ? "text-rose-400" : "text-emerald-400"
+                    pipeline.result.qml_intelligence.risk_score > 0.65 ? "text-bad" : "text-ok"
                   }`}>
                     {pipeline.result.qml_intelligence.risk_score > 0.65 ? <AlertTriangle className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
                     Risk: {(pipeline.result.qml_intelligence.risk_score * 100).toFixed(1)}%
                   </span>
                 ) : (
-                  <span className="text-xs text-purple-300 animate-pulse">Running circuit...</span>
+                  <span className="text-xs text-ink animate-pulse">Running circuit...</span>
                 )
               ) : (
-                <span className="text-xs text-slate-500">Waiting...</span>
+                <span className="text-xs text-faint">Waiting...</span>
               )}
             </div>
           </div>
 
           {/* Stage 4: Decision */}
-          <div className={`p-4 rounded-xl border transition ${
-            pipeline.step >= 4 ? "border-emerald-500/40 bg-emerald-500/5" : "border-slate-800 bg-slate-900/30 opacity-50"
+          <div className={`p-4 rounded border transition ${
+            pipeline.step >= 4 ? "border-ok/40 bg-ok-bg" : "border-line-2 bg-paper opacity-50"
           }`}>
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-mono font-semibold uppercase text-emerald-400">Stage 4: Decision</span>
-              <UserCheck className="h-4 w-4 text-emerald-400" />
+              <span className="text-[11px] font-mono font-semibold uppercase text-ok">Stage 4: Decision</span>
+              <UserCheck className="h-4 w-4 text-ok" />
             </div>
-            <div className="mt-2 font-bold text-sm text-white">Policy Resolution</div>
-            <div className="mt-1 text-xs text-slate-400">Human-In-The-Loop</div>
+            <div className="mt-2 font-bold text-sm text-ink">Policy Resolution</div>
+            <div className="mt-1 text-xs text-mute">Human-In-The-Loop</div>
             <div className="mt-3">
               {pipeline.result ? (
                 <Pill
@@ -296,7 +296,7 @@ export default function LiveDemo() {
                   {pipeline.result.decision}
                 </Pill>
               ) : (
-                <span className="text-xs text-slate-500">Waiting...</span>
+                <span className="text-xs text-faint">Waiting...</span>
               )}
             </div>
           </div>
@@ -304,46 +304,46 @@ export default function LiveDemo() {
 
         {/* Detailed Decision Report */}
         {pipeline.result && (
-          <div className="mt-6 rounded-xl border border-slate-800 bg-slate-950/60 p-5 space-y-4">
+          <div className="mt-6 rounded border border-line-2 bg-paper p-5 space-y-4">
             <div className="flex items-start justify-between">
               <div>
-                <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">System Verdict</div>
-                <div className="mt-1 text-xl font-bold text-white flex items-center gap-2">
+                <div className="text-xs font-semibold uppercase tracking-wider text-faint">System Verdict</div>
+                <div className="mt-1 text-xl font-bold text-ink flex items-center gap-2">
                   {pipeline.result.decision === "APPROVE" ? (
-                    <span className="text-emerald-400 flex items-center gap-2">
+                    <span className="text-ok flex items-center gap-2">
                       <CheckCircle2 className="h-6 w-6" /> Approved & Anchored
                     </span>
                   ) : pipeline.result.decision === "HUMAN_REVIEW" ? (
-                    <span className="text-amber-400 flex items-center gap-2">
+                    <span className="text-warn flex items-center gap-2">
                       <AlertTriangle className="h-6 w-6" /> Human Review Required
                     </span>
                   ) : (
-                    <span className="text-rose-400 flex items-center gap-2">
+                    <span className="text-bad flex items-center gap-2">
                       <XCircle className="h-6 w-6" /> Blocked (Security Violation)
                     </span>
                   )}
                 </div>
               </div>
               <div className="text-right">
-                <span className="text-xs text-slate-500">Execution Backend</span>
-                <div className="font-mono text-xs text-purple-300">{pipeline.result.qml_intelligence.backend}</div>
+                <span className="text-xs text-faint">Execution Backend</span>
+                <div className="font-mono text-xs text-ink">{pipeline.result.qml_intelligence.backend}</div>
               </div>
             </div>
 
-            <div className="rounded-lg bg-slate-900 p-4 border border-slate-800 text-sm text-slate-300 leading-relaxed">
-              <span className="font-semibold text-white">Action Rationale:</span> {pipeline.result.action_summary}
+            <div className="rounded bg-paper p-4 border border-line-2 text-sm text-body leading-relaxed">
+              <span className="font-semibold text-ink">Action Rationale:</span> {pipeline.result.action_summary}
             </div>
 
             {/* Behavioral Evidence */}
             {pipeline.result.qml_intelligence.behavioral_evidence && (
               <div>
-                <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <div className="text-xs font-semibold text-mute uppercase tracking-wider">
                   Behavioral Evidence Detected by QLIE
                 </div>
-                <ul className="mt-2 space-y-1.5 text-xs text-slate-300">
+                <ul className="mt-2 space-y-1.5 text-xs text-body">
                   {pipeline.result.qml_intelligence.behavioral_evidence.map((ev: string, i: number) => (
                     <li key={i} className="flex items-center gap-2">
-                      <span className="h-1.5 w-1.5 rounded-full bg-brand-400" />
+                      <span className="h-1.5 w-1.5 rounded-full bg-ink" />
                       {ev}
                     </li>
                   ))}
